@@ -2,7 +2,7 @@
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "sendText",
-    title: "Send to Gemini UE",
+    title: "Send to Geminify",
     contexts: ["selection"]
   });
 });
