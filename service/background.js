@@ -14,5 +14,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.storage.sync.set({ selectedText: info.selectionText }, () => {
       console.log("Selected text saved to storage:", info.selectionText);
     });
+
+    // Open the popup
+    chrome.action.openPopup();
   }
 });
