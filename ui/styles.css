@@ -1,0 +1,151 @@
+/* Basic resets */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f1f1;
+  width: 340px;
+  /* Ensure enough room for both sections */
+}
+
+/* Container padding */
+.popup-container {
+  padding: 12px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  background-color: #ddd;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.tab-button:hover {
+  background-color: #ccc;
+}
+
+.tab-button:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.tab-button:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.tab-button.active {
+  background-color: #4896bf;
+  color: #fff;
+}
+
+.section {
+  display: none; /* By default hidden */
+}
+
+.section.active {
+  display: block; /* Show the active section */
+}
+
+/* Selected text style */
+.selected-text-container {
+  background-color: #fff;
+  padding: 0.5rem;
+  border-radius: 8px;
+  min-height: 40px;
+  margin-bottom: 1rem;
+}
+
+.selected-text-container p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 124px;
+  overflow-y: auto;
+}
+
+/* User input area */
+textarea {
+  width: 100%;
+  height: 60px;
+  resize: none;
+  border-radius: 8px;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  margin-bottom: 0.5rem;
+}
+
+/* Send button */
+#sendBtn {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #4896bf;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Send button disabled */
+#sendBtn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Send button hover */
+#sendBtn:hover {
+  background-color: #ac48bf;
+}
+
+/* Response container */
+.response-container {
+  background-color: #fff;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.response-container h3 {
+  margin: 0 0 0.5rem 0;
+}
+
+#responseOutput {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Settings section */
+#apiKeyInput {
+  width: 100%;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+#saveApiKeyBtn {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: #4896bf;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#saveApiKeyBtn:hover {
+  background-color: #ac48bf;
+}
