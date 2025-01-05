@@ -1,6 +1,6 @@
-# Gemini Extension (Unofficial)
+# Gemini by Hulmify
 
-Unofficial extension for Google Gemini LLM
+Geminify is a browser extension that helps you summarize or query the content of a webpage using the Google's Gemini API.
 
 ## Installation
 
