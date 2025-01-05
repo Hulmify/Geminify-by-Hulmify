@@ -1,3 +1,4 @@
+const NO_CONTEXT_TEXT = "The context is empty. Select some text on the page to provide context.";
 
 // This script is responsible for the popup UI of the extension.
 document.addEventListener("DOMContentLoaded", () => {
@@ -38,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectedText) {
       selectedTextEl.textContent = selectedText;
     } else {
-      selectedTextEl.textContent = "The context is empty.";
+      selectedTextEl.textContent = NO_CONTEXT_TEXT;
     }
   });
 
@@ -62,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // If no context or user input
     if (!selectedText && !userInput) {
-      responseOutputEl.textContent = "No context or user input provided.";
+      responseOutputEl.innerText = "No context or user input provided.";
       return;
     }
 
@@ -73,10 +74,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Retrieve the key from storage
     chrome.storage.sync.get(["googleApiKey"], async ({ googleApiKey }) => {
+      // If no key found
       if (!googleApiKey) {
-        responseOutputEl.textContent = "No API key found. Please set it in Settings.";
+        responseOutputEl.innerText = "No API key found. Please set it in Settings.";
         return;
       }
+
+      // Get tab URL
+      const tab = await chrome.tabs.query({ active: true, currentWindow: true });
 
       // Call the OpenAI API
       try {
@@ -85,6 +90,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Construct the final prompt from the selected text + user input
         const prompt = `
+          System Prompt:
+          You are a Gemini Chrome extension user who replies to a user's query using the context provided.
+
+          Webpage URL:
+          ${tab[0].url}
+
+          Webpage Title:
+          ${tab[0].title}
+          
           Context:
           ${selectedText || 'No context provided.'}
 
@@ -125,16 +139,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json();
 
         // Extract the response from the data
-        const responseText = data?.candidates[0].content.parts[0].text;
+        const responseText = data?.candidates[0]?.content?.parts[0]?.text || "No response from the Gemini model.";
+
+        // Parse the response as Markdown
+        const markdown = window.marked.parse(responseText);
 
         // Update the UI with the response
-        responseOutputEl.textContent = responseText || "No response from the Gemini model.";
+        responseOutputEl.innerHTML = markdown;
       } catch (error) {
         // Log the error and update the UI
         console.error("Error:", error);
 
         // Update the UI with the error message
-        responseOutputEl.textContent = "An error occurred. Check console for details.";
+        responseOutputEl.innerText = "An error occurred. Check console for details.";
       } finally {
         // Re-enable the button
         sendBtn.disabled = false;
@@ -178,7 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearTextBtn = document.getElementById("clearSelection");
   clearTextBtn.addEventListener("click", () => {
     chrome.storage.sync.remove(["selectedText"], () => {
-      selectedTextEl.textContent = "";
+      selectedTextEl.textContent = NO_CONTEXT_TEXT;
     });
   });
 
