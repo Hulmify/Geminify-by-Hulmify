@@ -8,8 +8,7 @@ body {
   padding: 0;
   font-family: Arial, sans-serif;
   background: #f1f1f1;
-  width: 340px;
-  /* Ensure enough room for both sections */
+  width: 512px;
 }
 
 /* Container padding */
