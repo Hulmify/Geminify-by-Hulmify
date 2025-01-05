@@ -91,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Construct the final prompt from the selected text + user input
         const prompt = `
           System Prompt:
-          You are a Gemini Chrome extension user who replies to a user's query using the context provided.
+          You are a Gemini Chrome extension assistance which replies to a user's query using the context provided.
 
           Webpage URL:
           ${tab[0].url}
