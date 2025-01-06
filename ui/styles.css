@@ -71,7 +71,7 @@ body {
   margin: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
-  max-height: 124px;
+  max-height: 96px;
   overflow-y: auto;
 }
 

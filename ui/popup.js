@@ -199,4 +199,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // ============================
+  // 7. Select all text
+  // ============================
+  const selectAllBtn = document.getElementById("selectAll");
+
+  selectAllBtn.addEventListener("click", async () => {
+    // Get the active tab
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+    // Get page text
+    await chrome.scripting.executeScript(
+      {
+        target: { tabId: tab.id },
+        function: () => {
+          return document.body.innerText;
+        },
+      },
+      (results) => {
+        // Save the selected text
+        const text = results[0].result;
+
+        // Save the selected text
+        chrome.storage.sync.set({ selectedText: text }, () => {
+          selectedTextEl.textContent = text;
+        });
+
+        // Set the selected text in the UI
+        selectedTextEl.innerText = text;
+      }
+    );
+  });
+
 });
