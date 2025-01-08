@@ -141,6 +141,12 @@ document.addEventListener("DOMContentLoaded", () => {
         // Extract the response from the data
         const responseText = data?.candidates[0]?.content?.parts[0]?.text || "No response from the Gemini model.";
 
+
+        // Save the response to storage
+        chrome.storage.sync.set({ response: responseText }, () => {
+          console.log("Response saved to storage:", responseText);
+        });
+
         // Parse the response as Markdown
         const markdown = window.marked.parse(responseText);
 
@@ -194,8 +200,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================
   const clearTextBtn = document.getElementById("clearSelection");
   clearTextBtn.addEventListener("click", () => {
-    chrome.storage.sync.remove(["selectedText"], () => {
+    // Remove the selected text from storage
+    chrome.storage.sync.remove(["selectedText", 'response'], () => {
       selectedTextEl.textContent = NO_CONTEXT_TEXT;
+      responseOutputEl.innerHTML = "No response yet.";
     });
   });
 
@@ -222,13 +230,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Save the selected text
         chrome.storage.sync.set({ selectedText: text }, () => {
-          selectedTextEl.textContent = text;
+          console.log("Selected text saved to storage:", text);
         });
 
         // Set the selected text in the UI
         selectedTextEl.innerText = text;
       }
     );
+  });
+
+  // ============================
+  // 8. Retrieve stored response
+  // ============================
+  chrome.storage.sync.get(["response"], ({ response }) => {
+    if (response) {
+      const markdown = window.marked.parse(response);
+      responseOutputEl.innerHTML = markdown;
+    }
   });
 
 });
