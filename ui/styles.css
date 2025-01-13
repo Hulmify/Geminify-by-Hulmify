@@ -84,6 +84,7 @@ textarea {
   padding: 16px 8px;
   border: 1px solid #ccc;
   margin-bottom: 8px;
+  outline-color: #ac48bf;
 }
 
 /* Send button */
@@ -133,6 +134,7 @@ textarea {
   padding: 8px;
   border-radius: 4px;
   border: 1px solid #ccc;
+  outline-color: #ac48bf;
 }
 
 #saveApiKeyBtn {
@@ -147,4 +149,18 @@ textarea {
 
 #saveApiKeyBtn:hover {
   background-color: #ac48bf;
+}
+
+/* Base link styles */
+a {
+  text-decoration: none; /* Remove default underline */
+  color: #4896bf; /* Choose an accessible primary color */
+  font-weight: 500; /* Slightly bold for readability */
+  transition: color 0.3s, text-decoration 0.3s;
+}
+
+/* Hover state */
+a:hover {
+  color: #4896bf; /* Darker shade for hover */
+  text-decoration: underline; /* Reinforce link identity */
 }
