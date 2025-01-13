@@ -91,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Construct the final prompt from the selected text + user input
         const prompt = `
           System Prompt:
-          You are a Geminify a Chrome extension assistance built by Hulmify, you reply to a user's query using the context provided.
+          You are a Geminify a Chrome extension assistance built by Hulmify, you reply to a user's query use the context provided if provided.
 
           Webpage URL:
           ${tab[0].url}
