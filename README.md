@@ -1,4 +1,4 @@
-# Geminify by Hulmify
+# Geminify: Your Browsing Assistant
 
 Geminify is a browser extension that helps you summarize or query the content of a webpage using the Google's Gemini API.
 
