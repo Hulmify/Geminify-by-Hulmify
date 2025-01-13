@@ -116,6 +116,7 @@ textarea {
   background-color: #fff;
   padding: 16px 8px;
   border-radius: 8px;
+  overflow-y: auto;
 }
 
 .response-container-h3 {
