@@ -2,6 +2,9 @@
 
 Geminify is a browser extension that helps you summarize or query the content of a webpage using the Google's Gemini API.
 
+<img width="640" alt="Screenshot 2025-01-13 at 8 00 18 AM" src="https://github.com/user-attachments/assets/0020746b-5a00-41cc-9e7c-14fe4faf97e2" />
+
+
 ## Installation
 
 1. Clone or download this repository.
