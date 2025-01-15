@@ -1,4 +1,5 @@
-const NO_CONTEXT_TEXT = "The context is empty. Select some text on the page to provide context.";
+const NO_CONTEXT_TEXT =
+  "The context is empty. Select some text on the page to provide context.";
 
 // This script is responsible for the popup UI of the extension.
 document.addEventListener("DOMContentLoaded", () => {
@@ -56,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 4. Sending request to ChatGPT
   // ============================
 
-  const handler =  async () => {
+  const handler = async () => {
     // Retrieve the selected text and user input
     const selectedText = selectedTextEl.textContent.trim();
     const userInput = userInputEl.value.trim();
@@ -77,13 +78,17 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.sync.get(["googleApiKey"], async ({ googleApiKey }) => {
       // If no key found
       if (!googleApiKey) {
-        responseOutputEl.innerText = "No API key found. Please set it in Settings.";
+        responseOutputEl.innerText =
+          "No API key found. Please set it in Settings.";
         responseOutputEl.setAttribute("data-response", "");
         return;
       }
 
       // Get tab URL
-      const tab = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
 
       // Call the OpenAI API
       try {
@@ -102,10 +107,10 @@ document.addEventListener("DOMContentLoaded", () => {
           ${tab[0].title}
           
           Context:
-          ${selectedText || 'No context provided.'}
+          ${selectedText || "No context provided."}
 
           User's request:
-          ${userInput || 'Summarize the text.'}
+          ${userInput || "Summarize the text."}
         `;
 
         // We must append "?key=YOUR_API_KEY" to the endpoint
@@ -117,20 +122,20 @@ document.addEventListener("DOMContentLoaded", () => {
             {
               parts: [
                 {
-                  text: prompt
-                }
-              ]
-            }
-          ]
+                  text: prompt,
+                },
+              ],
+            },
+          ],
         };
 
         // Fetch from the Google endpoint
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -141,8 +146,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json();
 
         // Extract the response from the data
-        const responseText = data?.candidates[0]?.content?.parts[0]?.text || "No response from the Gemini model.";
-
+        const responseText =
+          data?.candidates[0]?.content?.parts[0]?.text ||
+          "No response from the Gemini model.";
 
         // Save the response to storage
         chrome.storage.sync.set({ response: responseText }, () => {
@@ -160,7 +166,8 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Error:", error);
 
         // Update the UI with the error message
-        responseOutputEl.innerText = "An error occurred. Check console for details.";
+        responseOutputEl.innerText =
+          "An error occurred. Check console for details.";
         responseOutputEl.setAttribute("data-response", "");
       } finally {
         // Re-enable the button
@@ -199,13 +206,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ============================ 
+  // ============================
   // 6. Clear selected text
   // ============================
   const clearTextBtn = document.getElementById("clearSelection");
   clearTextBtn.addEventListener("click", () => {
     // Remove the selected text from storage
-    chrome.storage.sync.remove(["selectedText", 'response'], () => {
+    chrome.storage.sync.remove(["selectedText", "response"], () => {
       selectedTextEl.textContent = NO_CONTEXT_TEXT;
       responseOutputEl.innerHTML = "No response yet.";
       responseOutputEl.setAttribute("data-response", "");
@@ -219,14 +226,83 @@ document.addEventListener("DOMContentLoaded", () => {
 
   selectAllBtn.addEventListener("click", async () => {
     // Get the active tab
-    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     // Get page text
     await chrome.scripting.executeScript(
       {
         target: { tabId: tab.id },
         function: () => {
-          return document.body.innerText;
+          // Get all text from the page
+          const documentText = document.body.innerText;
+
+          // Get all values from input, textarea, select
+          let allValues = "";
+          const getAllValueElements = document.querySelectorAll(
+            "input, textarea, select"
+          );
+          getAllValueElements.forEach((element) => {
+            // Get the name
+            let name = element.name;
+
+            // Get the value
+            let value = element.value;
+
+            // If the name is empty, find the closest label
+            if (!name) {
+              // Init the index
+              let parentLoopIndex = 0;
+
+              // Get the parent element
+              let parentElement = element;
+
+              // Loop through the parents
+              while (parentLoopIndex < 10) {
+                // Get the parent element
+                parentElement = parentElement?.parentElement;
+
+                // If no parent element, break the loop
+                if (!parentElement) {
+                  break;
+                }
+
+                // Query the label
+                const labelElement = parentElement.querySelector("label");
+
+                // If the labelElement is found?
+                if (labelElement) {
+                  // Get the name from the label
+                  name = labelElement.innerText;
+
+                  // Break the loop
+                  break;
+                }
+
+                // Increment the index
+                parentLoopIndex++;
+              }
+            }
+
+            // If Select Element? Get the selected option for value
+            if (element.tagName === "SELECT") {
+              // Get the selected option
+              const selectedOption = element.options[element.selectedIndex];
+
+              // Get the value
+              value = selectedOption.innerText;
+            }
+
+            // Add the value to the list
+            allValues += `Name: ${name || element.id || "Unkown"}, Value: ${
+              value || "Empty"
+            }\n`;
+            // End the add the value to the list
+          });
+
+          // Return the text
+          return `${documentText}${
+            allValues ? "\n\n===== Form Values =====\n\n" + allValues : ""
+          }`;
         },
       },
       (results) => {
@@ -277,5 +353,4 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   });
-
 });
