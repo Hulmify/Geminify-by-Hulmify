@@ -64,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // If no context or user input
     if (!selectedText && !userInput) {
       responseOutputEl.innerText = "No context or user input provided.";
+      responseOutputEl.setAttribute("data-response", "");
       return;
     }
 
@@ -77,6 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // If no key found
       if (!googleApiKey) {
         responseOutputEl.innerText = "No API key found. Please set it in Settings.";
+        responseOutputEl.setAttribute("data-response", "");
         return;
       }
 
@@ -152,12 +154,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Update the UI with the response
         responseOutputEl.innerHTML = markdown;
+        responseOutputEl.setAttribute("data-response", responseText);
       } catch (error) {
         // Log the error and update the UI
         console.error("Error:", error);
 
         // Update the UI with the error message
         responseOutputEl.innerText = "An error occurred. Check console for details.";
+        responseOutputEl.setAttribute("data-response", "");
       } finally {
         // Re-enable the button
         sendBtn.disabled = false;
@@ -204,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.sync.remove(["selectedText", 'response'], () => {
       selectedTextEl.textContent = NO_CONTEXT_TEXT;
       responseOutputEl.innerHTML = "No response yet.";
+      responseOutputEl.setAttribute("data-response", "");
     });
   });
 
@@ -246,6 +251,30 @@ document.addEventListener("DOMContentLoaded", () => {
     if (response) {
       const markdown = window.marked.parse(response);
       responseOutputEl.innerHTML = markdown;
+      responseOutputEl.setAttribute("data-response", response);
+    }
+  });
+
+  // ============================
+  // 9. Copy response to clipboard
+  // ============================
+  const copyBtn = document.getElementById("copyResponse");
+
+  copyBtn.addEventListener("click", () => {
+    const response = responseOutputEl.getAttribute("data-response");
+    if (response) {
+      navigator.clipboard.writeText(response).then(() => {
+        // Store the button text
+        const originalText = copyBtn.innerText;
+
+        // Update the UI to show that the text has been copied
+        copyBtn.innerText = "Copied!";
+
+        // Reset the text after 2 seconds
+        setTimeout(() => {
+          copyBtn.innerText = originalText;
+        }, 2000);
+      });
     }
   });
 
