@@ -242,6 +242,16 @@ document.addEventListener("DOMContentLoaded", () => {
             "input, textarea, select"
           );
           getAllValueElements.forEach((element) => {
+            // Remove sensitive data like password, email, auth token
+            if (
+              element.type === "password" ||
+              element.type === "email" ||
+              element.type === "hidden" ||
+              element.type === "file"
+            ) {
+              return;
+            }
+
             // Get the name
             let name = element.name;
 
@@ -290,16 +300,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
               // Get the value
               value = selectedOption.innerText;
-            }
-
-            // Remove sensitive data like password, email, auth token
-            if (
-              element.type === "password" ||
-              element.type === "email" ||
-              element.type === "hidden" ||
-              element.type === "file"
-            ) {
-              return;
             }
 
             // Add the value to the list
