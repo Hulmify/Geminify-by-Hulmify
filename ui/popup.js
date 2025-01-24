@@ -178,11 +178,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle Enter key press
   userInputEl.addEventListener("keydown", (event) => {
-    // If button is disabled, don't do anything
-    if (sendBtn.disabled) {
-      return;
-    }
-
     // If Enter key is pressed and the control key is not held down
     if (event.key === "Enter" && !event.shiftKey) {
       handler();
@@ -363,4 +358,21 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   });
+
+  // ============================
+  // 10. Save & Retrive user input from storage
+  // ============================
+  chrome.storage.sync.get(["userInput"], ({ userInput }) => {
+    if (userInput) {
+      userInputEl.value = userInput;
+    }
+  });
+
+  userInputEl.addEventListener("input", () => {
+    const userInput = userInputEl.value.trim();
+    chrome.storage.sync.set({ userInput }, () => {
+      console.log("User input saved to storage:", userInput);
+    });
+  });
+  // ============================ End of the script ============================
 });
