@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const handler = async () => {
     // Retrieve the selected text and user input
-    const selectedText = selectedTextEl.textContent.trim();
+    const selectedText = selectedTextEl.textContent.replace(/\s+/g, " ").trim();
     const userInput = userInputEl.value.trim();
 
     // If no context or user input
