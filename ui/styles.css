@@ -102,8 +102,8 @@ textarea {
 
 /* Send button disabled */
 #sendBtn:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
+  background-color: #ccc !important;
+  cursor: not-allowed !important;
 }
 
 /* Send button hover */
@@ -164,4 +164,9 @@ a {
 a:hover {
   color: #4896bf; /* Darker shade for hover */
   text-decoration: underline; /* Reinforce link identity */
+}
+
+#userInput {
+  resize: vertical;
+  min-height: 64px;
 }
