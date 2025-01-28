@@ -374,6 +374,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Add the handler on the response output for link clicks
+  responseOutputEl.addEventListener("click", (event) => {
+    // If the target is a link
+    if (event.target.tagName === "A") {
+      // Open the link in a new tab
+      chrome.tabs.create({ url: event.target.href });
+    }
+  });
+
   // ============================
   // 9. Copy response to clipboard
   // ============================
