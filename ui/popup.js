@@ -150,30 +150,41 @@ document.addEventListener("DOMContentLoaded", () => {
           data?.candidates[0]?.content?.parts[0]?.text ||
           "No response from the Gemini model.";
 
-        // Check if the response contains a search query
-        const REGEX_FOR_SEARCH = /\[SEARCH: "(.*?)"\]/;
+        // Check if the response contains a action to perform
+        const REGEX_FOR_ACTION = /\[([A-Z]+): "(.*?)"\]/;
 
         // Check if the response contains a search query
-        if ((search = responseText.match(REGEX_FOR_SEARCH))) {
-          // Call the Google Search API
-          const searchQuery = search[1];
+        if ((search = responseText.match(REGEX_FOR_ACTION))) {
+          // Get the action and the value
+          const action = search[1];
+          const actionValue = search[2];
 
-          // Check if the search query is not empty
-          if (searchQuery) {
-            // Set the loading text
-            responseOutputEl.innerText =
-              "Opening the search results in a new tab...";
+          // Perform the action based on the response
+          switch (action) {
+            case "SEARCH":
+              // Get the search query
+              const searchQuery = actionValue;
 
-            // Construct the search URL
-            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
-              searchQuery
-            )}&utm_source=geminify`;
+              // Check if the search query is not empty
+              if (searchQuery) {
+                // Set the loading text
+                responseOutputEl.innerText =
+                  "Opening the search results in a new tab...";
 
-            // Open the search URL in a new tab
-            chrome.tabs.create({ url: searchUrl });
+                // Construct the search URL
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+                  searchQuery
+                )}&utm_source=geminify`;
 
-            // Re-enable the button
-            responseText = `Search results opened in a new tab: [${searchQuery}](${searchUrl})`;
+                // Open the search URL in a new tab
+                chrome.tabs.create({ url: searchUrl });
+
+                // Set the response text
+                responseText = `Search results opened in a new tab: [${searchQuery}](${searchUrl})`;
+              }
+              break;
+            default:
+              break;
           }
         }
 
