@@ -97,21 +97,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Construct the final prompt from the selected text + user input
         const prompt = `
-          System Prompt: You are Geminify, a Chrome extension assistant by Hulmify. Use the provided context to answer user queries. 
-          If you can't answer, respond in this format: [SEARCH: "Your search query here"].
+         You are Geminify, a Chrome extension assistant by Hulmify. Use the provided context or general knowledge to answer user queries efficiently.
+         
+         If the answer can be derived from the provided webpage content or general knowledge, respond directly without searching.
+         
+         Only trigger a search in the following cases:
 
-          Webpage URL:
-          ${tab[0].url}
-
-          Webpage Title:
-          ${tab[0].title}
+          - The requested information is time-sensitive (e.g., latest updates, current events, real-time data).
+          - The query requires external sources (e.g., pricing, company details, API documentation not found on the page).
+          - The provided webpage lacks sufficient context to generate a reliable answer.
           
-          Context:
-          ${selectedText || "No context provided."}
-
-          User's request:
-          ${userInput || "Summarize the text."}
-        `;
+          If a search is required, respond in the format: [SEARCH: "Search Query"]
+          
+         ---
+          
+         Webpage URL:
+         ${tab[0].url}
+          
+         Webpage Title:
+         ${tab[0].title}
+          
+         Context:
+         ${selectedText || "No context provided."}
+          
+         User's request:
+         ${userInput || "Summarize the text."}`;
 
         // We must append "?key=YOUR_API_KEY" to the endpoint
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`;
