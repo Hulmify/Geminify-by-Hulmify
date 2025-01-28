@@ -97,8 +97,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Construct the final prompt from the selected text + user input
         const prompt = `
-          System Prompt:
-          You are a Geminify a Chrome extension assistance built by Hulmify, you reply to a user's query use the context provided if provided.
+          System Prompt: You are Geminify, a Chrome extension assistant by Hulmify. Use the provided context to answer user queries. 
+          If you can't answer, respond in this format: [SEARCH: "Your search query here"].
 
           Webpage URL:
           ${tab[0].url}
@@ -146,9 +146,36 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json();
 
         // Extract the response from the data
-        const responseText =
+        let responseText =
           data?.candidates[0]?.content?.parts[0]?.text ||
           "No response from the Gemini model.";
+
+        // Check if the response contains a search query
+        const REGEX_FOR_SEARCH = /\[SEARCH: "(.*?)"\]/;
+
+        // Check if the response contains a search query
+        if ((search = responseText.match(REGEX_FOR_SEARCH))) {
+          // Call the Google Search API
+          const searchQuery = search[1];
+
+          // Check if the search query is not empty
+          if (searchQuery) {
+            // Set the loading text
+            responseOutputEl.innerText =
+              "Opening the search results in a new tab...";
+
+            // Construct the search URL
+            const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+              searchQuery
+            )}&utm_source=geminify`;
+
+            // Open the search URL in a new tab
+            chrome.tabs.create({ url: searchUrl });
+
+            // Re-enable the button
+            responseText = `Search results opened in a new tab: [${searchQuery}](${searchUrl})`;
+          }
+        }
 
         // Save the response to storage
         chrome.storage.sync.set({ response: responseText }, () => {
