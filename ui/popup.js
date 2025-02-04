@@ -259,6 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedTextEl.textContent = NO_CONTEXT_TEXT;
       responseOutputEl.innerHTML = "No response yet.";
       responseOutputEl.setAttribute("data-response", "");
+      userInputEl.value = "";
     });
   });
 
