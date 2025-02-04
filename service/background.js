@@ -1,9 +1,17 @@
 // background.js
 chrome.runtime.onInstalled.addListener(() => {
+  // Add context on right-click
   chrome.contextMenus.create({
     id: "sendText",
     title: "Send to Geminify",
-    contexts: ["selection"]
+    contexts: ["selection"],
+  });
+
+  // Add context on textareas and input fields
+  chrome.contextMenus.create({
+    id: "refineText",
+    title: "Refine text with Geminify",
+    contexts: ["editable"],
   });
 });
 
@@ -17,5 +25,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
     // Open the popup
     chrome.action.openPopup();
+  } else if (info.menuItemId === "refineText") {
+    console.log("Refining text:", info);
+    chrome.tabs.sendMessage(tab.id, {
+      action: "refineText",
+      text: info.selectionText,
+    });
   }
 });

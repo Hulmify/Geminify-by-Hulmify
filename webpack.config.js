@@ -1,21 +1,30 @@
-const path = require('path');
+const path = require("path");
 
-module.exports = {
-  entry: './ui/popup.js',
-  output: {
-    filename: 'popup.min.js',
-    path: path.resolve(__dirname, 'ui'),
+module.exports = [
+  {
+    entry: "./ui/popup.js",
+    output: {
+      filename: "popup.min.js",
+      path: path.resolve(__dirname, "ui"),
+    },
+    module: {
+      rules: [
+        {
+          test: /\.js$/,
+          exclude: /node_modules/,
+          use: {
+            loader: "babel-loader",
+          },
+        },
+      ],
+    },
+    mode: "production",
   },
-  module: {
-    rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader'
-        }
-      }
-    ]
+  {
+    entry: "./scripts/content.js",
+    output: {
+      filename: "content.min.js",
+      path: path.resolve(__dirname, "scripts"),
+    },
   },
-  mode: 'production'
-};
+];
