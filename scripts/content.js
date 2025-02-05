@@ -11,14 +11,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const box = document.createElement("div");
     box.id = "geminify-box";
 
+    // Initialize params
+    const SPACING = 16;
+    const MAX_HEIGHT = 224;
+
+    // Calculate the maximum top position
+    const topPosition = rect.top + element.clientHeight + SPACING;
+
     // Position the box
     box.style.position = "absolute";
-    box.style.top = `${
-      // Add 16px to the top of the element
-      rect.top + window.scrollY + element.clientHeight + 16
-    }px`;
     box.style.left = `${rect.left + window.scrollX}px`;
     box.style.width = `${element.clientWidth}px`;
+
+    // If the box fits in the viewport
+    if (topPosition + MAX_HEIGHT < window.innerHeight) {
+      // Position the box below the element
+      box.style.top = `${topPosition}px`;
+    } else {
+      // Position the bottom of window
+      box.style.bottom = `${SPACING}px`;
+    }
 
     // Light theme styling
     box.style.backgroundColor = "#ffffff"; // Clean white background
@@ -30,6 +42,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     box.style.fontSize = "16px"; // Readable text size
     box.style.lineHeight = "1.5"; // Better readability
     box.style.border = "1px solid #dddddd"; // Light border for structure
+    box.style.overflow = "auto"; // Scroll if content overflows
+    box.style.maxHeight = `${MAX_HEIGHT}px`; // Limit the height of the box
 
     // Append the box to the parent of the element
     document.body.appendChild(box);
@@ -51,7 +65,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const prompt = `
         You're a Grammer Wizard! You will refine the text provided below.
         Don't change the text, tone or meaning. Just make it better and grammatically correct.
-        If you're unsure, you can leave it as it is.
+        If you're unsure or can't improve it, return the same text.
 
         Text:
         ${message.text.trim()}
