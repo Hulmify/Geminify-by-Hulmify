@@ -3,4 +3,5 @@ node_modules
 ui/popup.min.js
 package-lock.json
 ui/popup.min.js.LICENSE.txt
+scripts/content.min.js
 build/
