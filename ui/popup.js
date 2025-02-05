@@ -255,12 +255,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearTextBtn = document.getElementById("clearSelection");
   clearTextBtn.addEventListener("click", () => {
     // Remove the selected text from storage
-    chrome.storage.sync.remove(["selectedText", "response"], () => {
-      selectedTextEl.textContent = NO_CONTEXT_TEXT;
-      responseOutputEl.innerHTML = "No response yet.";
-      responseOutputEl.setAttribute("data-response", "");
-      userInputEl.value = "";
-    });
+    chrome.storage.sync.remove(
+      ["selectedText", "response", "userInput"],
+      () => {
+        selectedTextEl.textContent = NO_CONTEXT_TEXT;
+        responseOutputEl.innerHTML = "No response yet.";
+        responseOutputEl.setAttribute("data-response", "");
+        userInputEl.value = "";
+      }
+    );
   });
 
   // ============================
