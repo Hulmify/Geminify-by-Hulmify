@@ -33,6 +33,24 @@ function addBox(element, text, options = {}) {
   // Limit the height of the box
   box.style.maxHeight = `${MAX_HEIGHT}px`;
 
+  // Close button
+  const closeButton = document.createElement("button");
+
+  // Set the button ID
+  closeButton.id = "geminify-close-button";
+
+  // Set the button properties
+  closeButton.innerText = "X";
+
+  // Add a click event listener to the button
+  closeButton.addEventListener("click", () => {
+    // Remove the box
+    box.remove();
+  });
+
+  // Add the button to the box
+  box.appendChild(closeButton);
+
   // Add heading element
   const heading = document.createElement("h6");
 
@@ -64,6 +82,9 @@ function addBox(element, text, options = {}) {
 
     // Add a copy button
     const copyButton = document.createElement("button");
+
+    // Set the button ID
+    copyButton.id = "geminify-copy-button";
 
     // Set the button properties
     copyButton.innerText = "Copy";
@@ -126,7 +147,7 @@ function addStyles() {
       margin: 0 !important;
     }
 
-    #geminify-box button {
+    #geminify-box button#geminify-copy-button {
       margin-top: 4px;
       padding: 4px 8px;
       color: #4896bf;
@@ -139,18 +160,38 @@ function addStyles() {
       transition: background-color 0.2s;
     }
 
-    #geminify-box button:hover {
+    #geminify-box button#geminify-copy-button:hover {
       color: #ac48bf;
       border-color: #ac48bf;
     }
 
-    #geminify-box button:active {
+    #geminify-box button#geminify-copy-button:active {
       color: #ac48bf;
       border-color: #ac48bf;
     }
 
-    #geminify-box button:focus {
+    #geminify-box button#geminify-copy-button:focus {
       outline: none;
+    }
+
+    #geminify-box button#geminify-close-button {
+      background-color: transparent;
+      border: none;
+      color: #333333;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      border-radius: 50%;
+      height: 24px;
+      width: 24px;
+      transition: background-color 0.3s ease-in-out;
+    }
+
+    #geminify-box button#geminify-close-button:hover {
+      background-color: #DDDDDD;
     }
 
     #geminify-box > div {
