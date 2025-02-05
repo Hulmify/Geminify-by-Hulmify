@@ -17,7 +17,7 @@ function addBox(element, text, options = {}) {
   box.id = "geminify-box";
 
   // Position the box
-  box.style.position = "absolute";
+  box.style.position = "fixed";
   box.style.left = `${rect.left + window.scrollX}px`;
   box.style.width = `${element.clientWidth}px`;
 
