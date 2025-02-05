@@ -1,55 +1,179 @@
+function addBox(element, text, options = {}) {
+  // Remove existing box
+  document.getElementById("geminify-box")?.remove();
+
+  // Initialize params
+  const SPACING = 16;
+  const MAX_HEIGHT = 224;
+
+  // Get bounding client rect
+  const rect = element.getBoundingClientRect();
+
+  // Calculate the maximum top position
+  const topPosition = rect.top + element.clientHeight + SPACING;
+
+  // Add a box after the element
+  const box = document.createElement("div");
+  box.id = "geminify-box";
+
+  // Position the box
+  box.style.position = "absolute";
+  box.style.left = `${rect.left + window.scrollX}px`;
+  box.style.width = `${element.clientWidth}px`;
+
+  // If the box fits in the viewport?
+  if (topPosition + MAX_HEIGHT < window.innerHeight) {
+    // Position the box below the element
+    box.style.top = `${topPosition}px`;
+  } else {
+    // Else, position the bottom of window
+    box.style.bottom = `${SPACING}px`;
+  }
+
+  // Limit the height of the box
+  box.style.maxHeight = `${MAX_HEIGHT}px`;
+
+  // Add heading element
+  const heading = document.createElement("h6");
+
+  // Set heading text
+  heading.innerText = "Geminify's Suggestion";
+
+  // Append the heading to the box
+  box.appendChild(heading);
+
+  // Add paragraph element
+  const paragraph = document.createElement("p");
+
+  // Set the margin of the paragraph
+  paragraph.style.margin = "2px 0 !important";
+
+  // Set the text of the paragraph
+  paragraph.innerText = text;
+
+  // Replace the text in the element
+  box.appendChild(paragraph);
+
+  // Add copy button
+  if (options.onCopy) {
+    // Add inner div for copy button
+    const innerDiv = document.createElement("div");
+
+    // Add the inner div to the box
+    box.appendChild(innerDiv);
+
+    // Add a copy button
+    const copyButton = document.createElement("button");
+
+    // Set the button properties
+    copyButton.innerText = "Copy";
+
+    // Add the button to the box
+    innerDiv.appendChild(copyButton);
+
+    // Add a click event listener to the button
+    copyButton.addEventListener("click", () => {
+      // Copy the text to the clipboard
+      navigator.clipboard.writeText(text);
+
+      // Change button text
+      copyButton.innerText = "Copied!";
+    });
+  }
+
+  // Append the box to the body
+  document.body.appendChild(box);
+
+  // Focus the box
+  box.focus();
+}
+
+function addStyles() {
+  // If the styles are already added
+  if (document.getElementById("geminify-styles")) {
+    return;
+  }
+
+  // Add styles to the page
+  const style = document.createElement("style");
+
+  // Set the ID of the style
+  style.id = "geminify-styles";
+
+  // Set the inner HTML of the style
+  style.innerHTML = `
+    #geminify-box {
+      color: #333333;
+      background-color: #FFFFFF;
+      border: 1px solid #DDDDDD;
+      border-radius: 12px;
+      box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+      font-size: 16px;
+      line-height: 1.5;
+      padding: 12px 16px;
+      position: absolute;
+      z-index: 2147483647;
+      overflow: auto;
+    }
+
+    #geminify-box h6 {
+      color: #4896bf;
+      margin: 0 0 8px;
+    }
+
+    #geminify-box p {
+      color: inherit;
+      margin: 0 !important;
+    }
+
+    #geminify-box button {
+      margin-top: 4px;
+      padding: 4px 8px;
+      color: #4896bf;
+      background-color: #FFFFFF;
+      border: 1px solid #4896bf;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1.5;
+      transition: background-color 0.2s;
+    }
+
+    #geminify-box button:hover {
+      color: #ac48bf;
+      border-color: #ac48bf;
+    }
+
+    #geminify-box button:active {
+      color: #ac48bf;
+      border-color: #ac48bf;
+    }
+
+    #geminify-box button:focus {
+      outline: none;
+    }
+
+    #geminify-box > div {
+      margin-top: 4px;
+      text-align: right;
+    }
+  `;
+
+  // Append the styles to the head
+  document.head.appendChild(style);
+}
+
 // Get background.js messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "refineText") {
     // Get current focussed element
     const element = document.activeElement;
 
-    // Get bounding client rect
-    const rect = element.getBoundingClientRect();
+    // Add styles
+    addStyles();
 
-    // Add a box after the element
-    const box = document.createElement("div");
-    box.id = "geminify-box";
-
-    // Initialize params
-    const SPACING = 16;
-    const MAX_HEIGHT = 224;
-
-    // Calculate the maximum top position
-    const topPosition = rect.top + element.clientHeight + SPACING;
-
-    // Position the box
-    box.style.position = "absolute";
-    box.style.left = `${rect.left + window.scrollX}px`;
-    box.style.width = `${element.clientWidth}px`;
-
-    // If the box fits in the viewport
-    if (topPosition + MAX_HEIGHT < window.innerHeight) {
-      // Position the box below the element
-      box.style.top = `${topPosition}px`;
-    } else {
-      // Position the bottom of window
-      box.style.bottom = `${SPACING}px`;
-    }
-
-    // Light theme styling
-    box.style.backgroundColor = "#ffffff"; // Clean white background
-    box.style.color = "#333333"; // Dark grey text for readability
-    box.style.padding = "12px 16px"; // Balanced spacing
-    box.style.borderRadius = "12px"; // Smooth rounded edges
-    box.style.zIndex = "9999"; // Ensuring it stays on top
-    box.style.boxShadow = "0px 4px 12px rgba(0, 0, 0, 0.1)"; // Soft shadow for depth
-    box.style.fontSize = "16px"; // Readable text size
-    box.style.lineHeight = "1.5"; // Better readability
-    box.style.border = "1px solid #dddddd"; // Light border for structure
-    box.style.overflow = "auto"; // Scroll if content overflows
-    box.style.maxHeight = `${MAX_HEIGHT}px`; // Limit the height of the box
-
-    // Append the box to the parent of the element
-    document.body.appendChild(box);
-
-    // Add loading text to the box
-    box.innerHTML = `<p style="margin: 2px !important;">Refining the text...</p>`;
+    // Add loading text
+    addBox(element, "Refining the text...");
 
     // Get the API key from storage
     chrome.storage.sync.get("googleApiKey", ({ googleApiKey }) => {
@@ -97,64 +221,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
         .then((response) => response.json())
         .then((data) => {
-          // Clear the box
-          box.innerHTML = "";
-
           // Extract the response from the data
           let refinedText =
             data?.candidates[0]?.content?.parts[0]?.text ||
             "No response from the Gemini model.";
 
-          // Create a paragraph element
-          const paragraph = document.createElement("p");
-
-          // Set the margin of the paragraph
-          paragraph.style.margin = "2px 0 !important";
-
-          // Set the text of the paragraph
-          paragraph.innerText = refinedText;
-
           // Replace the text in the element
-          box.appendChild(paragraph);
-
-          // Add a copy button
-          const copyButton = document.createElement("button");
-
-          // Set the button properties
-          copyButton.innerText = "Copy";
-          copyButton.style.marginTop = "4px";
-          copyButton.style.padding = "4px 8px";
-          copyButton.style.color = "#333333";
-          copyButton.style.backgroundColor = "#FFFFFF";
-          copyButton.style.border = "1px solid #333333";
-          copyButton.style.borderRadius = "8px";
-          copyButton.style.cursor = "pointer";
-          copyButton.style.fontSize = "16px";
-          copyButton.style.lineHeight = "1.5";
-          copyButton.style.transition = "background-color 0.2s";
-          copyButton.style.width = "100%";
-
-          // Add the button to the box
-          box.appendChild(copyButton);
-
-          // Add a click event listener to the button
-          copyButton.addEventListener("click", () => {
-            // Copy the text to the clipboard
-            navigator.clipboard.writeText(refinedText);
-
-            // Change button text
-            copyButton.innerText = "Copied!";
-          });
+          addBox(element, refinedText, { onCopy: true });
         })
         .catch((error) => {
           // Replace the text in the element
-          box.innerText = "An error occurred while refining the text.";
+          addBox(element, "Error occurred while refining the text.");
         });
       // End of fetch
     });
-
-    // Focus the box
-    box.focus();
   }
 });
 
