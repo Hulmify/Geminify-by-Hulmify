@@ -37,7 +37,7 @@ function addBox(element, text, options = {}) {
   const heading = document.createElement("h6");
 
   // Set heading text
-  heading.innerText = "Geminify's Suggestion";
+  heading.innerText = "Geminify's Response";
 
   // Append the heading to the box
   box.appendChild(heading);
