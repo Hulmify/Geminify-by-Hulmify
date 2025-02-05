@@ -157,7 +157,9 @@ function addStyles() {
       margin-top: 4px;
       text-align: right;
     }
-  `;
+  `
+    .replace(/([\r\n]+|\s{2,})/g, " ")
+    .trim();
 
   // Append the styles to the head
   document.head.appendChild(style);
