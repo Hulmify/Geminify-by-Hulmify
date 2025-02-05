@@ -26,7 +26,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     // Open the popup
     chrome.action.openPopup();
   } else if (info.menuItemId === "refineText") {
-    console.log("Refining text:", info);
     chrome.tabs.sendMessage(tab.id, {
       action: "refineText",
       text: info.selectionText,
