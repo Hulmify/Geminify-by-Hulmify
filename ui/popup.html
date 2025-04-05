@@ -32,7 +32,7 @@
         </div>
         <textarea
           id="userInput"
-          placeholder="Enter your text here..."
+          placeholder="Enter your query here..."
         ></textarea>
         <button id="sendBtn">Send</button>
         <h3 class="response-container-h3">Response</h3>
@@ -47,13 +47,29 @@
       <!-- SETTINGS SECTION -->
       <div id="settingsSection" class="section">
         <h2>Geminify | Settings</h2>
-        <label for="apiKeyInput">Gemini API Key</label>
-        <input
-          type="text"
-          id="apiKeyInput"
-          placeholder="Enter your Gemini API Key"
-        />
-        <button id="saveApiKeyBtn">Save API Key</button>
+        <div style="margin-bottom: 16px">
+          <label for="refineCustomPromptInput">Custom Prompt</label>
+          <textarea
+            id="refineCustomPromptInput"
+            placeholder="Enter your custom prompt for refining here..."
+            style="margin-bottom: 4px; margin-top: 8px"
+          ></textarea>
+          <button id="refineCustomPromptBtn">Save Custom Prompt</button>
+          <p>
+            <strong>Note:</strong> This custom prompt is intended solely for
+            text refinement actions and will not affect the main application
+            functionality.
+          </p>
+        </div>
+        <div>
+          <label for="apiKeyInput">Gemini API Key</label>
+          <input
+            type="text"
+            id="apiKeyInput"
+            placeholder="Enter your Gemini API Key"
+          />
+          <button id="saveApiKeyBtn">Save API Key</button>
+        </div>
         <div
           style="
             display: flex;

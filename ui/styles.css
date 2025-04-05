@@ -138,7 +138,8 @@ textarea {
   outline-color: #ac48bf;
 }
 
-#saveApiKeyBtn {
+#saveApiKeyBtn,
+#refineCustomPromptBtn {
   width: 100%;
   padding: 8px;
   background-color: #4896bf;
@@ -148,7 +149,8 @@ textarea {
   cursor: pointer;
 }
 
-#saveApiKeyBtn:hover {
+#saveApiKeyBtn:hover,
+#refineCustomPromptBtn:hover {
   background-color: #ac48bf;
 }
 
@@ -166,7 +168,8 @@ a:hover {
   text-decoration: underline; /* Reinforce link identity */
 }
 
-#userInput {
+#userInput,
+#refineCustomPromptInput {
   resize: vertical;
   min-height: 64px;
 }

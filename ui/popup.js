@@ -16,6 +16,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const apiKeyInput = document.getElementById("apiKeyInput");
   const saveApiKeyBtn = document.getElementById("saveApiKeyBtn");
 
+  const refineCustomPromptInput = document.getElementById(
+    "refineCustomPromptInput"
+  );
+  const refineCustomPromptBtn = document.getElementById(
+    "refineCustomPromptBtn"
+  );
+
   // ============================
   // 1. Tab toggling
   // ============================
@@ -45,13 +52,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ============================
-  // 3. Retrieve saved API key
+  // 3. Retrieve saved API key & other settings
   // ============================
-  chrome.storage.sync.get(["googleApiKey"], ({ googleApiKey }) => {
-    if (googleApiKey) {
-      apiKeyInput.value = googleApiKey;
+  chrome.storage.sync.get(
+    ["googleApiKey", "refineCustomPrompt"],
+    ({ googleApiKey, refineCustomPrompt }) => {
+      // If googleApiKey is present, set it in the input
+      if (googleApiKey) {
+        apiKeyInput.value = googleApiKey;
+      }
+
+      // If refineCustomPrompt is present, set it in the input
+      if (refineCustomPrompt) {
+        refineCustomPromptInput.value = refineCustomPrompt;
+      }
     }
-  });
+  );
 
   // ============================
   // 4. Sending request to ChatGPT
@@ -435,5 +451,23 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("User input saved to storage:", userInput);
     });
   });
+
+  // ============================
+  // 11. Save custom prompt
+  // ============================
+  refineCustomPromptBtn.addEventListener("click", () => {
+    const newPrompt = refineCustomPromptInput.value.trim();
+    if (newPrompt) {
+      chrome.storage.sync.set({ refineCustomPrompt: newPrompt }, () => {
+        alert("Custom prompt saved successfully!");
+      });
+    } else {
+      // Remove the custom prompt from storage
+      chrome.storage.sync.remove("refineCustomPrompt", () => {
+        alert("Custom prompt removed successfully!");
+      });
+    }
+  });
+
   // ============================ End of the script ============================
 });

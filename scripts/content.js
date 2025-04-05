@@ -219,65 +219,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     addBox(element, "Refining the text...");
 
     // Get the API key from storage
-    chrome.storage.sync.get("googleApiKey", ({ googleApiKey }) => {
-      // If the API key is not set
-      if (!googleApiKey) {
-        // Replace the text in the element
-        box.innerText =
-          "Please set your Geminify API key in the extension options.";
-        return;
-      }
+    chrome.storage.sync.get(
+      ["googleApiKey", "refineCustomPrompt"],
+      ({ googleApiKey, refineCustomPrompt }) => {
+        // If the API key is not set
+        if (!googleApiKey) {
+          // Replace the text in the element
+          box.innerText =
+            "Please set your Geminify API key in the extension options.";
+          return;
+        }
 
-      // Prompt
-      const prompt = `
-        You're a Grammer Wizard! You will refine the text provided below.
+        // Default system prompt
+        const systemPrompt = `You're a Grammer Wizard! You will refine the text provided below.
         Don't change the text, tone or meaning. Just make it better and grammatically correct.
-        If you're unsure or can't improve it, return the same text.
+        If you're unsure or can't improve it, return the same text.`;
+
+        // Prompt
+        const prompt = `${refineCustomPrompt || systemPrompt}
 
         Text:
-        ${message.text.trim()}
-      `;
+        ${message.text.trim()}`;
 
-      // We must append "?key=YOUR_API_KEY" to the endpoint
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`;
+        // We must append "?key=YOUR_API_KEY" to the endpoint
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`;
 
-      // Body must match the structure for PaLM/Gemini
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
+        // Body must match the structure for PaLM/Gemini
+        const requestBody = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+        };
+
+        // Fetch the API
+        fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        ],
-      };
-
-      // Fetch the API
-      fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          // Extract the response from the data
-          let refinedText =
-            data?.candidates[0]?.content?.parts[0]?.text ||
-            "No response from the Gemini model.";
-
-          // Replace the text in the element
-          addBox(element, refinedText, { onCopy: true });
+          body: JSON.stringify(requestBody),
         })
-        .catch((error) => {
-          // Replace the text in the element
-          addBox(element, "Error occurred while refining the text.");
-        });
-      // End of fetch
-    });
+          .then((response) => response.json())
+          .then((data) => {
+            // Extract the response from the data
+            let refinedText =
+              data?.candidates[0]?.content?.parts[0]?.text ||
+              "No response from the Gemini model.";
+
+            // Replace the text in the element
+            addBox(element, refinedText, { onCopy: true });
+          })
+          .catch((error) => {
+            // Replace the text in the element
+            addBox(element, "Error occurred while refining the text.");
+          });
+        // End of fetch
+      }
+    );
   }
 });
 
