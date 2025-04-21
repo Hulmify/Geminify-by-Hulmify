@@ -7,7 +7,7 @@
         "build": "webpack --mode production",
         "generate": "zip -r build/geminify.zip . -x \"*.DS_Store\" -x \"node_modules/*\" -x \".git/*\" -x \"ui/popup.js\" -x \"package-lock.json\" -x \"build/*\""
     },
-    "author": "Aron",
+    "author": "Zoeb Chhatriwala",
     "license": "MIT",
     "dependencies": {
         "@babel/core": "^7.26.0",

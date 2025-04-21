@@ -140,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
          ${userInput || "Summarize the text."}`;
 
         // We must append "?key=YOUR_API_KEY" to the endpoint
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleApiKey}`;
 
         // Body must match the structure for PaLM/Gemini
         const requestBody = {

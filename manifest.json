@@ -1,7 +1,7 @@
 {
   "name": "Geminify: Your Browsing Assistant",
   "description": "Geminify is a browser extension that helps you summarize or query the content of a webpage using Google's Gemini API.",
-  "version": "1.58",
+  "version": "1.59",
   "manifest_version": 3,
   "permissions": [
     "contextMenus",
