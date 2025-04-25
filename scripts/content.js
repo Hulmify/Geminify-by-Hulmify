@@ -1,3 +1,5 @@
+import * as marked from "../ui/marked.min.js";
+
 function addBox(element, text, options = {}) {
   // Remove existing box
   document.getElementById("geminify-box")?.remove();
@@ -60,22 +62,24 @@ function addBox(element, text, options = {}) {
   // Append the heading to the box
   box.appendChild(heading);
 
-  // Add paragraph element
-  const paragraph = document.createElement("p");
+  // Add content element
+  const contentElement = document.createElement("div");
+  contentElement.className = "geminify-content";
 
-  // Set the margin of the paragraph
-  paragraph.style.margin = "2px 0 !important";
+  // Set the margin of the content element
+  contentElement.style.margin = "0px 8px";
 
-  // Set the text of the paragraph
-  paragraph.innerText = text;
+  // Set the text of the content element
+  contentElement.innerHTML = marked.parse(text);
 
   // Replace the text in the element
-  box.appendChild(paragraph);
+  box.appendChild(contentElement);
 
   // Add copy button
   if (options.onCopy) {
     // Add inner div for copy button
     const innerDiv = document.createElement("div");
+    innerDiv.className = "geminify-footer";
 
     // Add the inner div to the box
     box.appendChild(innerDiv);
@@ -194,8 +198,8 @@ function addStyles() {
       background-color: #DDDDDD;
     }
 
-    #geminify-box > div {
-      margin-top: 4px;
+    #geminify-box > div.geminify-footer {
+      margin-top: 8px;
       text-align: right;
     }
   `
