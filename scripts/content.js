@@ -245,8 +245,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         Text:
         ${message.text.trim()}`;
 
-        // We must append "?key=YOUR_API_KEY" to the endpoint
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleApiKey}`;
+        // API endpoint
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
         // Body must match the structure for PaLM/Gemini
         const requestBody = {
@@ -265,6 +265,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         fetch(endpoint, {
           method: "POST",
           headers: {
+            "x-goog-api-key": googleApiKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(requestBody),
