@@ -5,7 +5,8 @@
     "main": "ui/popup.min.js",
     "scripts": {
         "build": "webpack --mode production",
-        "generate": "zip -r build/geminify.zip . -x \"*.DS_Store\" -x \"node_modules/*\" -x \".git/*\" -x \"ui/popup.js\" -x \"package-lock.json\" -x \"build/*\""
+        "generate": "zip -r build/geminify.zip . -x \"*.DS_Store\" -x \"node_modules/*\" -x \".git/*\" -x \"ui/popup.js\" -x \"package-lock.json\" -x \"build/*\"",
+        "clean": "rm -rf build/geminify.zip"
     },
     "author": "Zoeb Chhatriwala",
     "license": "MIT",
