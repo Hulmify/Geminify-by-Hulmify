@@ -2,104 +2,15 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Geminify | Hulmify</title>
+    <title>Geminify | Your AI Assistant</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div class="popup-container">
-      <!-- Navigation / Tabs -->
-      <div class="tabs">
-        <button id="mainTab" class="tab-button active">Main</button>
-        <button id="settingsTab" class="tab-button">Settings</button>
-      </div>
-
-      <!-- MAIN SECTION -->
-      <div id="mainSection" class="section active">
-        <h2>Geminify: Your Browsing Assistant</h2>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 4px;
-          "
-        >
-          <a href="#" id="selectAll">Select All</a>
-          <a href="#" id="clearSelection">Clear</a>
-        </div>
-        <div class="selected-text-container">
-          <p id="selectedText"></p>
-        </div>
-        <textarea
-          id="userInput"
-          placeholder="Enter your query here..."
-        ></textarea>
-        <button id="sendBtn">Send</button>
-        <h3 class="response-container-h3">Response</h3>
-        <div style="text-align: right; margin-bottom: 4px">
-          <a href="#" id="copyResponse">Copy to clipboard</a>
-        </div>
-        <div class="response-container">
-          <div id="responseOutput">No response yet.</div>
-        </div>
-      </div>
-
-      <!-- SETTINGS SECTION -->
-      <div id="settingsSection" class="section">
-        <h2>Geminify | Settings</h2>
-        <div style="margin-bottom: 16px">
-          <label for="refineCustomPromptInput">Custom Prompt</label>
-          <textarea
-            id="refineCustomPromptInput"
-            placeholder="Enter your custom prompt for refining here..."
-            style="margin-bottom: 4px; margin-top: 8px"
-          ></textarea>
-          <button id="refineCustomPromptBtn">Save Custom Prompt</button>
-          <p>
-            <strong>Note:</strong> This custom prompt is intended solely for
-            text refinement actions and will not affect the main application
-            functionality.
-          </p>
-        </div>
-        <div>
-          <label for="apiKeyInput">Gemini API Key</label>
-          <input
-            type="text"
-            id="apiKeyInput"
-            placeholder="Enter your Gemini API Key"
-          />
-          <button id="saveApiKeyBtn">Save API Key</button>
-        </div>
-        <div
-          style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 8px;
-            gap: 4px;
-            flex-wrap: wrap;
-          "
-        >
-          <a
-            href="https://deepmind.google/technologies/gemini/pro?utm_source=hulmify&utm_medium=extension&utm_campaign=gemini"
-            target="_blank"
-            >Get your Gemini API Key</a
-          >
-          <a href="https://www.youtube.com/watch?v=o8iyrtQyrZM" target="_blank"
-            >How to Generate a Google Gemini API Key</a
-          >
-        </div>
-      </div>
-      <div style="margin-top: 8px; text-align: center">
-        Built by <a href="https://hulmify.com/" target="_blank">Hulmify</a>,
-        powered by
-        <a
-          href="https://deepmind.google/technologies/gemini/pro?utm_source=hulmify&utm_medium=extension&utm_campaign=gemini"
-          target="_blank"
-          >Gemini</a
-        >
-      </div>
-    </div>
+    <div id="root"></div>
+    <!-- Script name must match output in webpack config -->
     <script src="popup.min.js"></script>
   </body>
 </html>

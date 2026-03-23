@@ -1,303 +1,204 @@
 import { marked } from "marked";
 
 function addBox(element, text, options = {}) {
-  // Remove existing box
   document.getElementById("geminify-box")?.remove();
-
-  // Initialize params
   const SPACING = 16;
   const MAX_HEIGHT = 224;
-
-  // Get bounding client rect
   const rect = element.getBoundingClientRect();
-
-  // Calculate the maximum top position
   const topPosition = rect.top + element.clientHeight + SPACING;
 
-  // Add a box after the element
   const box = document.createElement("div");
   box.id = "geminify-box";
-
-  // Position the box
   box.style.position = "fixed";
   box.style.left = `${rect.left + window.scrollX}px`;
   box.style.width = `${element.clientWidth}px`;
 
-  // If the box fits in the viewport?
   if (topPosition + MAX_HEIGHT < window.innerHeight) {
-    // Position the box below the element
     box.style.top = `${topPosition}px`;
   } else {
-    // Else, position the bottom of window
     box.style.bottom = `${SPACING}px`;
   }
-
-  // Limit the height of the box
   box.style.maxHeight = `${MAX_HEIGHT}px`;
 
-  // Close button
   const closeButton = document.createElement("button");
-
-  // Set the button ID
   closeButton.id = "geminify-close-button";
-
-  // Set the button properties
-  closeButton.innerText = "X";
-
-  // Add a click event listener to the button
-  closeButton.addEventListener("click", () => {
-    // Remove the box
-    box.remove();
-  });
-
-  // Add the button to the box
+  closeButton.innerHTML = "&times;";
+  closeButton.addEventListener("click", () => box.remove());
   box.appendChild(closeButton);
 
-  // Add heading element
   const heading = document.createElement("h6");
-
-  // Set heading text
-  heading.innerText = "Geminify's Response";
-
-  // Append the heading to the box
+  heading.innerText = options.title || "Geminify Response";
   box.appendChild(heading);
 
-  // Add content element
   const contentElement = document.createElement("div");
   contentElement.className = "geminify-content";
-
-  // Set the margin of the content element
-  contentElement.style.margin = "0px 8px";
-
-  // Set the text of the content element
   contentElement.innerHTML = marked.parse(text);
-
-  // Replace the text in the element
   box.appendChild(contentElement);
 
-  // Add copy button
-  if (options.onCopy) {
-    // Add inner div for copy button
-    const innerDiv = document.createElement("div");
-    innerDiv.className = "geminify-footer";
+  const innerDiv = document.createElement("div");
+  innerDiv.className = "geminify-footer";
+  box.appendChild(innerDiv);
 
-    // Add the inner div to the box
-    box.appendChild(innerDiv);
+  const copyButton = document.createElement("button");
+  copyButton.id = "geminify-copy-button";
+  copyButton.innerText = "Copy";
+  innerDiv.appendChild(copyButton);
 
-    // Add a copy button
-    const copyButton = document.createElement("button");
+  copyButton.addEventListener("click", () => {
+    navigator.clipboard.writeText(text);
+    copyButton.innerText = "Copied!";
+    setTimeout(() => { copyButton.innerText = "Copy"; }, 2000);
+  });
 
-    // Set the button ID
-    copyButton.id = "geminify-copy-button";
-
-    // Set the button properties
-    copyButton.innerText = "Copy";
-
-    // Add the button to the box
-    innerDiv.appendChild(copyButton);
-
-    // Add a click event listener to the button
-    copyButton.addEventListener("click", () => {
-      // Copy the text to the clipboard
-      navigator.clipboard.writeText(text);
-
-      // Change button text
-      copyButton.innerText = "Copied!";
-    });
-  }
-
-  // Append the box to the body
   document.body.appendChild(box);
-
-  // Focus the box
   box.focus();
 }
 
 function addStyles() {
-  // If the styles are already added
-  if (document.getElementById("geminify-styles")) {
-    return;
-  }
-
-  // Add styles to the page
+  if (document.getElementById("geminify-styles")) return;
   const style = document.createElement("style");
-
-  // Set the ID of the style
   style.id = "geminify-styles";
-
-  // Set the inner HTML of the style
   style.innerHTML = `
     #geminify-box {
-      color: #333333;
-      background-color: #FFFFFF;
-      border: 1px solid #DDDDDD;
-      border-radius: 12px;
-      box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-      font-size: 16px;
-      line-height: 1.5;
-      padding: 12px 16px;
-      position: absolute;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 16px 20px;
+      position: fixed;
       z-index: 2147483647;
-      overflow: auto;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 480px;
+      min-width: 320px;
     }
-
-    #geminify-box h6 {
-      color: #4896bf;
-      margin: 0 0 8px;
-    }
-
-    #geminify-box p {
-      color: inherit;
-      margin: 0 !important;
-    }
-
-    #geminify-box button#geminify-copy-button {
-      margin-top: 4px;
-      padding: 4px 8px;
-      color: #4896bf;
-      background-color: #FFFFFF;
-      border: 1px solid #4896bf;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1.5;
-      transition: background-color 0.2s;
-    }
-
-    #geminify-box button#geminify-copy-button:hover {
-      color: #ac48bf;
-      border-color: #ac48bf;
-    }
-
-    #geminify-box button#geminify-copy-button:active {
-      color: #ac48bf;
-      border-color: #ac48bf;
-    }
-
-    #geminify-box button#geminify-copy-button:focus {
-      outline: none;
-    }
-
-    #geminify-box button#geminify-close-button {
-      background-color: transparent;
-      border: none;
-      color: #333333;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-      position: absolute;
-      right: 8px;
-      top: 8px;
-      border-radius: 50%;
-      height: 24px;
-      width: 24px;
-      transition: background-color 0.3s ease-in-out;
-    }
-
-    #geminify-box button#geminify-close-button:hover {
-      background-color: #DDDDDD;
-    }
-
-    #geminify-box > div.geminify-footer {
-      margin-top: 8px;
-      text-align: right;
-    }
-  `
-    .replace(/([\r\n]+|\s{2,})/g, " ")
-    .trim();
-
-  // Append the styles to the head
+    #geminify-box h6 { color: #4896bf; margin: 0; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+    .geminify-content { margin: 0 !important; color: #334155; max-height: 250px; overflow-y: auto; font-size: 0.9rem; }
+    .geminify-content p { margin-bottom: 8px !important; }
+    .geminify-footer { display: flex; justify-content: flex-end; margin-top: 4px; gap: 8px; }
+    #geminify-box button#geminify-copy-button { padding: 6px 12px; color: #4896bf!important; background: #f8fafc!important; border: 1px solid #e2e8f0!important; border-radius: 6px!important; cursor: pointer!important; font-size: 12px!important; font-weight: 600!important; }
+    #geminify-box button#geminify-close-button { display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 18px; position: absolute; right: 10px; top: 10px; height: 24px; width: 24px; transition: all 0.2s ease; }
+    #geminify-box button#geminify-close-button:hover { background: #f1f5f9; color: #475569; border-radius: 4px; }
+  `;
   document.head.appendChild(style);
 }
 
-// Get background.js messages
+const callGemini = async (prompt, apiKey, model) => {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-flash-latest'}:generateContent?key=${apiKey}`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+  });
+  if (!response.ok) throw new Error("API request failed");
+  const data = await response.json();
+  return data?.candidates[0]?.content?.parts[0]?.text || "No response.";
+};
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "refineText") {
-    // Get current focussed element
     const element = document.activeElement;
+    const originalText = (message.text || element.value || element.innerText || "").trim();
+    if (!originalText) return;
 
-    // Add styles
     addStyles();
+    addBox(element, "Thinking...");
 
-    // Add loading text
-    addBox(element, "Refining the text...");
-
-    // Get the API key from storage
-    chrome.storage.sync.get(
-      ["googleApiKey", "refineCustomPrompt"],
-      ({ googleApiKey, refineCustomPrompt }) => {
-        // If the API key is not set
-        if (!googleApiKey) {
-          // Replace the text in the element
-          box.innerText =
-            "Please set your Geminify API key in the extension options.";
-          return;
-        }
-
-        // Default system prompt
-        const systemPrompt = `You're a Grammer Wizard! You will refine the text provided below.
-        Don't change the text, tone or meaning. Just make it better and grammatically correct.
-        If you're unsure or can't improve it, return the same text.`;
-
-        // Prompt
-        const prompt = `${refineCustomPrompt || systemPrompt}
-
-        Text:
-        ${message.text.trim()}`;
-
-        // API endpoint
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-
-        // Body must match the structure for PaLM/Gemini
-        const requestBody = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        };
-
-        // Fetch the API
-        fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "x-goog-api-key": googleApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            // Extract the response from the data
-            let refinedText =
-              data?.candidates[0]?.content?.parts[0]?.text ||
-              "No response from the Gemini model.";
-
-            // Replace the text in the element
-            addBox(element, refinedText, { onCopy: true });
-          })
-          .catch((error) => {
-            // Replace the text in the element
-            addBox(element, "Error occurred while refining the text.");
-          });
-        // End of fetch
+    chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "selectedModel"], async (data) => {
+      if (!data.googleApiKey) {
+        addBox(element, "Settings Error: API Key missing.");
+        return;
       }
-    );
-  }
-});
 
-// Remove the box when the user clicks outside
-document.addEventListener("click", (event) => {
-  // Get the box
-  const box = document.getElementById("geminify-box");
+      let systemPrompt = "";
+      switch (message.tone) {
+        case "grammar":
+          systemPrompt = "Act as a world-class editor. Fix grammar, spelling, and punctuation errors in the provided text. Keep the exact same meaning and tone. Output ONLY the corrected text.";
+          break;
+        case "professional":
+          systemPrompt = "Rewrite this text to be professional, polished, and suitable for corporate communication. Fix any linguistic errors. Output ONLY the refined text.";
+          break;
+        case "concise":
+          systemPrompt = "Make the following text as concise as possible while keeping all core information. Remove fluff and fix grammar. Output ONLY the shortened text.";
+          break;
+        case "friendly":
+          systemPrompt = "Rewrite this text to have a friendly, warm, and inviting tone while staying clear and correct. Output ONLY the refined text.";
+          break;
+        case "custom":
+          systemPrompt = data.refineCustomPrompt || "Refine the text based on standard professional clarity.";
+          break;
+        default:
+          systemPrompt = "Fix grammar and improve flow. Output ONLY the corrected text.";
+      }
 
-  // If the box exists and the click is outside the box
-  if (box && !box.contains(event.target)) {
-    // Remove the box
-    box.remove();
+      try {
+        const refined = await callGemini(`${systemPrompt}\n\nText: ${originalText}`, data.googleApiKey, data.selectedModel);
+        addBox(element, refined, { onCopy: true });
+      } catch (err) {
+        addBox(element, "Error: Could not reach Gemini. Check your key.");
+      }
+    });
+  } else if (message.action === "autoSummarize") {
+    addStyles();
+    const floatingStatus = document.createElement("div");
+    floatingStatus.style = "position:fixed;top:20px;right:20px;padding:10px 20px;background:#4896bf;color:white;border-radius:10px;z-index:100000;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.2);";
+    floatingStatus.innerText = "Summarizing Page...";
+    document.body.appendChild(floatingStatus);
+
+    chrome.storage.sync.get(["googleApiKey", "selectedModel"], async (data) => {
+      if (!data.googleApiKey) {
+        floatingStatus.innerText = "Error: Set API Key";
+        setTimeout(() => floatingStatus.remove(), 3000);
+        return;
+      }
+      try {
+        const pageText = document.body.innerText.substring(0, 10000); // Token efficiency: cap at 10k chars
+        const summary = await callGemini(`Summarize the following webpage content professionally in 3-5 concise bullet points. Provide a title first.\n\nURL: ${window.location.href}\nTitle: ${document.title}\n\nContent:\n${pageText}`, data.googleApiKey, data.selectedModel);
+
+        // Save to storage
+        chrome.storage.local.get({ savedPages: [] }, (localData) => {
+          const newPage = {
+            url: window.location.href,
+            title: document.title,
+            summary: summary,
+            timestamp: Date.now()
+          };
+          chrome.storage.local.set({ savedPages: [newPage, ...localData.savedPages].slice(0, 20) }); // Save last 20
+        });
+
+        floatingStatus.innerText = "Page Saved!";
+        setTimeout(() => floatingStatus.remove(), 2000);
+      } catch (err) {
+        floatingStatus.innerText = "Summary Failed.";
+        setTimeout(() => floatingStatus.remove(), 3000);
+      }
+    });
+  } else if (message.action === "performAction") {
+    const { type, value } = message;
+    try {
+      if (type === "SCROLL") {
+        window.scrollBy({ top: value === "down" ? 500 : -500, behavior: "smooth" });
+      } else if (type === "CLICK") {
+        const el = document.querySelector(value);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => el.click(), 500);
+        }
+      } else if (type === "TYPE") {
+        const [selector, text] = value.split("|");
+        const el = document.querySelector(selector);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.value = text;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
+    } catch (e) { console.error("Geminify Action Error:", e); }
   }
 });

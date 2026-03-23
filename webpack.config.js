@@ -5,7 +5,7 @@ module.exports = {
   mode: process.env.NODE_ENV || "production",
   devtool: "cheap-module-source-map",
   entry: {
-    "ui/popup.min": "./src/ui/popup.js",
+    "ui/popup.min": "./src/ui/popup.jsx",
     "content/content.min": "./src/content/content.js",
   },
   output: {
@@ -13,10 +13,13 @@ module.exports = {
     filename: "[name].js",
     clean: true,
   },
+  resolve: {
+    extensions: [".js", ".jsx"],
+  },
   module: {
     rules: [
       {
-        test: /\.js$/,
+        test: /\.(js|jsx)$/,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
