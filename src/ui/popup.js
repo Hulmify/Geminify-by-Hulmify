@@ -1,3 +1,5 @@
+import { marked } from "marked";
+
 const NO_CONTEXT_TEXT =
   "The context is empty. Select some text on the page to provide context.";
 
@@ -221,7 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // Parse the response as Markdown
-        const markdown = window.marked.parse(responseText);
+        const markdown = marked.parse(responseText);
 
         // Update the UI with the response
         responseOutputEl.innerHTML = markdown;
@@ -399,7 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================
   chrome.storage.sync.get(["response"], ({ response }) => {
     if (response) {
-      const markdown = window.marked.parse(response);
+      const markdown = marked.parse(response);
       responseOutputEl.innerHTML = markdown;
       responseOutputEl.setAttribute("data-response", response);
     }

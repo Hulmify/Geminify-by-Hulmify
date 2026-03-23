@@ -2,11 +2,13 @@
     "name": "geminify",
     "version": "1.0.0",
     "description": "",
-    "main": "ui/popup.min.js",
+    "main": "ui/popup.js",
     "scripts": {
         "build": "webpack --mode production",
-        "generate": "zip -r build/geminify.zip . -x \"*.DS_Store\" -x \"node_modules/*\" -x \".git/*\" -x \"ui/popup.js\" -x \"package-lock.json\" -x \"build/*\"",
-        "clean": "rm -rf build/geminify.zip"
+        "watch": "webpack --watch --mode development",
+        "dev": "npm run watch",
+        "generate": "bash scripts/generate.sh",
+        "clean": "rm -rf build dist"
     },
     "author": "Zoeb Chhatriwala",
     "license": "MIT",
@@ -14,7 +16,11 @@
         "@babel/core": "^7.26.0",
         "@babel/preset-env": "^7.26.0",
         "babel-loader": "^9.2.1",
+        "marked": "^17.0.5",
         "webpack": "^5.97.1",
         "webpack-cli": "^6.0.1"
+    },
+    "devDependencies": {
+        "copy-webpack-plugin": "^14.0.0"
     }
 }

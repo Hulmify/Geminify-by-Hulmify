@@ -1,4 +1,4 @@
-import * as marked from "../ui/marked.min.js";
+import { marked } from "marked";
 
 function addBox(element, text, options = {}) {
   // Remove existing box

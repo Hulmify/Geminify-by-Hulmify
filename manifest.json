@@ -10,7 +10,7 @@
     "storage"
   ],
   "background": {
-    "service_worker": "service/background.js"
+    "service_worker": "background/background.js"
   },
   "action": {
     "default_icon": {
@@ -30,7 +30,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["scripts/content.min.js"]
+      "js": ["content/content.min.js"]
     }
   ]
 }

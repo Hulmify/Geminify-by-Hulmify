@@ -5,3 +5,4 @@ package-lock.json
 ui/popup.min.js.LICENSE.txt
 scripts/content.min.js
 build/
+dist/
