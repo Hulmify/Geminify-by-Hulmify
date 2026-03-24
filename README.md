@@ -18,8 +18,8 @@ To run Geminify from the source:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/Zoeb-Chatriwala/ext.geminify.git
-   cd ext.geminify
+   git clone https://github.com/Hulmify/Geminify-by-Hulmify.git
+   cd Geminify-by-Hulmify
    ```
 
 2. **Install Dependencies**:
