@@ -1,18 +1,29 @@
 import { marked } from "marked";
 
+/**
+ * Creates and displays a floating response box near the active element.
+ * 
+ * @param {HTMLElement} element - The target element to position the box near.
+ * @param {string} text - The content (markdown) to display in the box.
+ * @param {Object} options - Configuration options (e.g., custom title).
+ */
 function addBox(element, text, options = {}) {
+  // Clear any existing box to avoid clones
   document.getElementById("geminify-box")?.remove();
+
   const SPACING = 16;
   const MAX_HEIGHT = 224;
   const rect = element.getBoundingClientRect();
   const topPosition = rect.top + element.clientHeight + SPACING;
 
+  // 1. Create the main container
   const box = document.createElement("div");
   box.id = "geminify-box";
   box.style.position = "fixed";
   box.style.left = `${rect.left + window.scrollX}px`;
   box.style.width = `${element.clientWidth}px`;
 
+  // 2. Determine optimal vertical positioning
   if (topPosition + MAX_HEIGHT < window.innerHeight) {
     box.style.top = `${topPosition}px`;
   } else {
@@ -20,6 +31,7 @@ function addBox(element, text, options = {}) {
   }
   box.style.maxHeight = `${MAX_HEIGHT}px`;
 
+  // 3. Header & Controls
   const closeButton = document.createElement("button");
   closeButton.id = "geminify-close-button";
   closeButton.innerHTML = "&times;";
@@ -30,11 +42,13 @@ function addBox(element, text, options = {}) {
   heading.innerText = options.title || "Geminify Response";
   box.appendChild(heading);
 
+  // 4. Main content (parsed markdown)
   const contentElement = document.createElement("div");
   contentElement.className = "geminify-content";
   contentElement.innerHTML = marked.parse(text);
   box.appendChild(contentElement);
 
+  // 5. Footer actions
   const innerDiv = document.createElement("div");
   innerDiv.className = "geminify-footer";
   box.appendChild(innerDiv);
@@ -50,12 +64,17 @@ function addBox(element, text, options = {}) {
     setTimeout(() => { copyButton.innerText = "Copy"; }, 2000);
   });
 
+  // 6. Injection & Focus
   document.body.appendChild(box);
   box.focus();
 }
 
+/**
+ * Injects required CSS for the floating boxes into the page head.
+ */
 function addStyles() {
   if (document.getElementById("geminify-styles")) return;
+
   const style = document.createElement("style");
   style.id = "geminify-styles";
   style.innerHTML = `
@@ -89,19 +108,115 @@ function addStyles() {
   document.head.appendChild(style);
 }
 
+/**
+ * Generic helper to call the Gemini API.
+ * 
+ * @param {string} prompt - The prompt to send.
+ * @param {string} apiKey - Google API Key.
+ * @param {string} model - Target model ID.
+ * @returns {Promise<string>} The response text.
+ */
 const callGemini = async (prompt, apiKey, model) => {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-flash-latest'}:generateContent?key=${apiKey}`;
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
   });
+
   if (!response.ok) throw new Error("API request failed");
+
   const data = await response.json();
   return data?.candidates[0]?.content?.parts[0]?.text || "No response.";
 };
 
+/**
+ * Heuristic to categorize a page based on its URL and metadata for filtering.
+ */
+function getCategoryForUrl(url, customCategories = []) {
+  const lowUrl = url.toLowerCase();
+  
+  // 1. Check User-Defined Custom Categories First
+  for (const cat of customCategories) {
+    if (cat.keywords.some(kw => lowUrl.includes(kw.toLowerCase()))) {
+      return cat.name;
+    }
+  }
+
+  // 2. Default Fallbacks
+  if (lowUrl.includes("google.com/search")) return "Search";
+  if (lowUrl.includes("github.com") || lowUrl.includes("stackoverflow") || lowUrl.includes("docs.")) return "Dev";
+  if (lowUrl.includes("youtube.com") || lowUrl.includes("netflix.com")) return "Media";
+  if (lowUrl.includes("twitter.com") || lowUrl.includes("linkedin.com") || lowUrl.includes("facebook.com")) return "Social";
+  if (lowUrl.includes("news.") || lowUrl.includes("cnn.com") || lowUrl.includes("bbc.")) return "News";
+  
+  return "Insight";
+}
+
+/**
+ * Helper to persist a page summary to local storage.
+ */
+function saveSummaryToStorage(summary) {
+  chrome.storage.sync.get(["customCategories"], (syncData) => {
+    chrome.storage.local.get({ savedPages: [] }, (localData) => {
+      const newPage = {
+        url: window.location.href,
+        title: document.title,
+        summary: summary,
+        category: getCategoryForUrl(window.location.href, syncData.customCategories || []),
+        timestamp: Date.now()
+      };
+      
+      // Keep library size manageable but useful
+      chrome.storage.local.set({ savedPages: [newPage, ...localData.savedPages].slice(0, 40) });
+    });
+  });
+}
+
+/**
+ * Extracts a heuristic summary from the page without using an LLM.
+ * Useful for zero-token saving and offline summarization.
+ */
+function extractLocalSummary() {
+  // 1. Core Metadata
+  const metaDesc = document.querySelector('meta[name="description"]')?.content || 
+                  document.querySelector('meta[property="og:description"]')?.content || "";
+  
+  // 2. Intelligent Content Snippet (Priority: article > main > body)
+  const mainContent = document.querySelector("article") || document.querySelector("main") || document.body;
+  const rawText = mainContent.innerText.substring(0, 1000).replace(/\s+/g, " ").trim();
+  const snippet = rawText.substring(0, 400) + (rawText.length > 400 ? "..." : "");
+
+  // 3. Structural Highlights (Headings)
+  const headings = Array.from(document.querySelectorAll("h1, h2, h3"))
+    .slice(0, 4)
+    .map(h => `- ${h.innerText.trim()}`)
+    .filter(t => t.length > 4) // Filter out noise
+    .join("\n");
+
+  // 4. Construct Polished Output
+  let text = `### Insight Overview\n\n`;
+  
+  if (metaDesc) {
+    text += `**Description:** ${metaDesc}\n\n`;
+  }
+
+  if (headings) {
+    text += `**Structural Highlights:**\n${headings}\n\n`;
+  }
+
+  text += `**Detailed Preview:**\n${snippet}`;
+
+  return text;
+}
+
+/**
+ * Main listener for messages from the background script.
+ */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+
+  // --- ACTION: Refine Text ---
   if (message.action === "refineText") {
     const element = document.activeElement;
     const originalText = (message.text || element.value || element.innerText || "").trim();
@@ -110,75 +225,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     addStyles();
     addBox(element, "Thinking...");
 
-    chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "selectedModel"], async (data) => {
+    chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "selectedModel", "isFreePlan"], async (data) => {
       if (!data.googleApiKey) {
         addBox(element, "Settings Error: API Key missing.");
         return;
       }
 
+      // Select system prompt based on requested tone
       let systemPrompt = "";
       switch (message.tone) {
-        case "grammar":
-          systemPrompt = "Act as a world-class editor. Fix grammar, spelling, and punctuation errors in the provided text. Keep the exact same meaning and tone. Output ONLY the corrected text.";
-          break;
-        case "professional":
-          systemPrompt = "Rewrite this text to be professional, polished, and suitable for corporate communication. Fix any linguistic errors. Output ONLY the refined text.";
-          break;
-        case "concise":
-          systemPrompt = "Make the following text as concise as possible while keeping all core information. Remove fluff and fix grammar. Output ONLY the shortened text.";
-          break;
-        case "friendly":
-          systemPrompt = "Rewrite this text to have a friendly, warm, and inviting tone while staying clear and correct. Output ONLY the refined text.";
-          break;
-        case "custom":
-          systemPrompt = data.refineCustomPrompt || "Refine the text based on standard professional clarity.";
-          break;
-        default:
-          systemPrompt = "Fix grammar and improve flow. Output ONLY the corrected text.";
+        case "grammar": systemPrompt = "Act as a world-class editor. Fix grammar, spelling, and punctuation. Output ONLY adjusted text."; break;
+        case "professional": systemPrompt = "Rewrite to be professional and polished. Output ONLY refined text."; break;
+        case "concise": systemPrompt = "Make as concise as possible while keeping core info. Output ONLY shortened text."; break;
+        case "friendly": systemPrompt = "Rewrite to be friendly and warm. Output ONLY refined text."; break;
+        case "custom": systemPrompt = data.refineCustomPrompt || "Refine text for clarity."; break;
+        default: systemPrompt = "Fix grammar and improve flow. Output ONLY corrected text.";
       }
 
       try {
-        const refined = await callGemini(`${systemPrompt}\n\nText: ${originalText}`, data.googleApiKey, data.selectedModel);
+        const freeTierNote = data.isFreePlan ? " (Note: Be extremely concise to save tokens)" : "";
+        const refined = await callGemini(`${systemPrompt}${freeTierNote}\n\nText: ${originalText}`, data.googleApiKey, data.selectedModel);
         addBox(element, refined, { onCopy: true });
       } catch (err) {
         addBox(element, "Error: Could not reach Gemini. Check your key.");
       }
     });
+
+  // --- ACTION: Auto Summarize Page ---
   } else if (message.action === "autoSummarize") {
     addStyles();
+    
+    // Create a temporary floating status indicator
     const floatingStatus = document.createElement("div");
     floatingStatus.style = "position:fixed;top:20px;right:20px;padding:10px 20px;background:#4896bf;color:white;border-radius:10px;z-index:100000;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.2);";
     floatingStatus.innerText = "Summarizing Page...";
     document.body.appendChild(floatingStatus);
 
-    chrome.storage.sync.get(["googleApiKey", "selectedModel"], async (data) => {
+    chrome.storage.sync.get(["googleApiKey", "selectedModel", "isFreePlan", "useAiSummaries"], async (data) => {
+      // Local summary path (zero tokens)
+      if (data.useAiSummaries === false) {
+        const localSummary = extractLocalSummary();
+        saveSummaryToStorage(localSummary);
+        floatingStatus.innerText = "Page Saved!";
+        setTimeout(() => floatingStatus.remove(), 2000);
+        return;
+      }
+
+      // AI summary path (uses tokens)
       if (!data.googleApiKey) {
         floatingStatus.innerText = "Error: Set API Key";
         setTimeout(() => floatingStatus.remove(), 3000);
         return;
       }
-      try {
-        const pageText = document.body.innerText.substring(0, 10000); // Token efficiency: cap at 10k chars
-        const summary = await callGemini(`Summarize the following webpage content professionally in 3-5 concise bullet points. Provide a title first.\n\nURL: ${window.location.href}\nTitle: ${document.title}\n\nContent:\n${pageText}`, data.googleApiKey, data.selectedModel);
 
-        // Save to storage
-        chrome.storage.local.get({ savedPages: [] }, (localData) => {
-          const newPage = {
-            url: window.location.href,
-            title: document.title,
-            summary: summary,
-            timestamp: Date.now()
-          };
-          chrome.storage.local.set({ savedPages: [newPage, ...localData.savedPages].slice(0, 20) }); // Save last 20
-        });
+      try {
+        const limit = data.isFreePlan ? 3500 : 10000;
+        const pageText = document.body.innerText.substring(0, limit); 
+        const freeTierNote = data.isFreePlan ? " Provide 2-3 extremely concise bullet points max." : " Provide 3-5 concise bullet points.";
+        
+        const summary = await callGemini(`Summarize the following webpage content professionally${freeTierNote} Provide a title first.\n\nURL: ${window.location.href}\nTitle: ${document.title}\n\nContent:\n${pageText}`, data.googleApiKey, data.selectedModel);
+        saveSummaryToStorage(summary);
 
         floatingStatus.innerText = "Page Saved!";
         setTimeout(() => floatingStatus.remove(), 2000);
+
       } catch (err) {
         floatingStatus.innerText = "Summary Failed.";
         setTimeout(() => floatingStatus.remove(), 3000);
       }
     });
+
+  // --- ACTION: Perform Browser Automation ---
   } else if (message.action === "performAction") {
     const { type, value } = message;
     try {
@@ -201,4 +318,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     } catch (e) { console.error("Geminify Action Error:", e); }
   }
+
 });

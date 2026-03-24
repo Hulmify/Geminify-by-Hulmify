@@ -1,7 +1,7 @@
 {
-  "name": "Geminify: Your Browsing Assistant",
-  "description": "Geminify is a browser extension that helps you summarize or query the content of a webpage using Google's Gemini API.",
-  "version": "1.61",
+  "name": "Geminify: AI Summarizer & Assistant",
+  "description": "Transform your browsing with AI-powered page summarization, smart chat, and 4.0 reasoning. Geminify helps you capture, understand, and organize web insights instantly using Google Gemini.",
+  "version": "1.62",
   "manifest_version": 3,
   "permissions": [
     "contextMenus",
@@ -30,8 +30,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content/content.min.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/content.min.js"
+      ]
     }
   ]
 }

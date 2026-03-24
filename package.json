@@ -1,6 +1,6 @@
 {
     "name": "geminify",
-    "version": "1.0.0",
+    "version": "1.62",
     "description": "",
     "main": "ui/popup.js",
     "scripts": {
