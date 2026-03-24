@@ -1,41 +1,71 @@
-# Geminify: Your Browsing Assistant
+# Geminify ✨
 
-Geminify is a browser extension that helps you summarize or query the content of a webpage using Google's Gemini API.
+**Geminify** is a powerful AI browser assistant built on Google's Gemini Flash model. Summarize pages, chat with context, and organize web insights instantly—directly within your browser.
 
-![geminify_ss](https://github.com/user-attachments/assets/7615b151-51be-4363-8303-b45aa216ca9c)
+![geminify_ss](https://lh3.googleusercontent.com/iyzcDJuomO8rKjnIgG4cBcHBb3-dc6dM0F7v_3anYJELJwQrFwVJF6fE-WenzcKfatTtm4IArifrvZKRp_S08Hwi=s1280-w1280-h800)
 
-## Installation
+## 🚀 Key Features
 
-1. Clone or download this repository.
-2. Open Chrome and navigate to `chrome://extensions/`.
-3. Enable "Developer mode" using the toggle switch in the top-right corner.
-4. Click "Load unpacked" and select the folder containing this project.
+- **Instant Summarization**: Get the gist of any webpage in seconds.
+- **Contextual Chat**: Ask questions about the current page and get real-time AI responses.
+- **Web Insights**: Organize and extract key insights from your browsing with ease.
+- **Context Menu Integration**: Right-click to trigger actions on selected text.
+- **Modern UI**: A clean, React-powered, responsive popup interface.
 
-## Permissions
+## 🛠️ Installation (Developer Mode)
 
-This extension requires the following permissions:
+To run Geminify from the source:
 
-- **contextMenus**: To add custom context menu options.
-- **activeTab**: To interact with the currently active browser tab.
-- **scripting**: To execute scripts on the webpage.
-- **storage**: To store and retrieve extension settings.
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/Zoeb-Chatriwala/ext.geminify.git
+   cd ext.geminify
+   ```
 
-## File Structure
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-- **manifest.json**: Contains extension configuration.
-- **service/background.js**: Background service worker for managing events and logic.
-- **ui/popup.html**: The HTML file for the popup interface.
-- **scripts/content.js**: Scripts that interact with webpage content.
-- **icons/**: Directory containing the extension icons in various sizes.
+3. **Build the Extension**:
+   ```bash
+   npm run build
+   ```
+   *This will create a `dist` folder containing the compiled extension.*
 
-## Contributing
+4. **Load into Chrome**:
+   - Open Chrome and navigate to `chrome://extensions/`.
+   - Enable **"Developer mode"** (top-right toggle).
+   - Click **"Load unpacked"**.
+   - Select the `dist` folder generated in step 3.
 
-Contributions are welcome! Please open an issue or submit a pull request to suggest changes or report bugs.
+## 🔑 Configuration
 
-## Disclaimer
+To use Geminify, you'll need a Google Gemini API Key:
+1. Head over to [Google AI Studio](https://aistudio.google.com/).
+2. Create your API key.
+3. Open the Geminify popup in your browser and enter the key in the settings.
 
-This is an **unofficial** extension and is not affiliated with or endorsed by Google or the Gemini LLM team.
+## 🏗️ Project Structure
 
-## License
+- `src/ui/`: React components (JSX) and styles for the extension popup.
+- `src/background/`: Service worker for background events and API handling.
+- `src/content/`: Content scripts that interact with webpage content.
+- `assets/`: Static assets like icons.
+- `webpack.config.js`: Module bundler configuration.
+
+## 💻 Tech Stack
+
+- **Framework**: [React](https://reactjs.org/) (v19)
+- **Bundler**: [Webpack](https://webpack.js.org/)
+- **Parser**: [Babel](https://babeljs.io/)
+- **AI Model**: [Google Gemini Flash](https://deepmind.google/technologies/gemini/)
+
+## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+*Disclaimer: This is an **unofficial** extension and is not affiliated with or endorsed by Google.*
+
