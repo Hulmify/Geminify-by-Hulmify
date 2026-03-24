@@ -1,6 +1,6 @@
 {
   "name": "Geminify: AI Summarizer & Assistant",
-  "description": "Transform your browsing with AI-powered page summarization, smart chat, and 4.0 reasoning. Geminify helps you capture, understand, and organize web insights instantly using Google Gemini.",
+  "description": "Summarize pages, chat with context, and organize web insights instantly using the power of Google Gemini AI.",
   "version": "1.62",
   "manifest_version": 3,
   "permissions": [
