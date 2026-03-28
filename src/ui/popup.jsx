@@ -73,14 +73,14 @@ const App = () => {
     // 3. Setup dynamic listener for storage changes
     const storageListener = (changes) => {
       if (changes.savedPages) setSavedPages(changes.savedPages.newValue);
-      
+
       if (changes.selectedText) {
         chrome.storage.sync.get(["isFreePlan"], (data) => {
           const maxChars = data.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
           setSelectedText(changes.selectedText.newValue.substring(0, maxChars));
         });
       }
-      
+
       if (changes.isFreePlan) setIsFreePlan(changes.isFreePlan.newValue);
       if (changes.useAiSummaries) setUseAiSummaries(changes.useAiSummaries.newValue);
       if (changes.autoCopy) setAutoCopy(changes.autoCopy.newValue);
@@ -118,10 +118,10 @@ const App = () => {
       });
       setModels(filtered);
 
-    } catch (err) { 
-      console.error("Failed to fetch models:", err); 
-    } finally { 
-      setIsLoadingModels(false); 
+    } catch (err) {
+      console.error("Failed to fetch models:", err);
+    } finally {
+      setIsLoadingModels(false);
     }
   };
 
@@ -143,14 +143,14 @@ const App = () => {
       }
       const tab = tabs[0];
       const currentSelectedText = selectedText === NO_CONTEXT_TEXT ? "" : selectedText;
-      
+
       // Combine current context with the stacked multi-page collection
       const fullContext = [...contextStack, currentSelectedText].filter(t => t.trim().length > 0).join("\n---\n");
 
       // 2. Prepare the payload
       const freeTierNote = isFreePlan ? " (Important: Be extremely concise to save tokens)" : "";
       const prompt = `Act as Geminify by Hulmify. Efficiently summarize/answer using the provided context.${freeTierNote}
-        Supported actions: [SEARCH: "query"], [GOTO: "url"], [SCROLL: "up/down"], [CLICK: "selector"], [TYPE: "selector|text"], [NOTIFY: "message"].
+        Supported actions: [SEARCH: "query"], [GOTO: "url"], [SCROLL: "up/down" or "down every 2s"], [CLICK: "selector"], [TYPE: "selector|text"], [NOTIFY: "message"].
         
         URL: ${tab.url}
         Page: ${tab.title}
@@ -162,9 +162,9 @@ const App = () => {
       // 3. Perform the API call
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { 
+        headers: {
           "x-goog-api-key": googleApiKey,
-          "Content-Type": "application/json" 
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       });
@@ -184,7 +184,7 @@ const App = () => {
         switch (action) {
           case "SEARCH": chrome.tabs.create({ url: `https://www.google.com/search?q=${encodeURIComponent(val)}` }); responseText = `Searching: ${val}`; break;
           case "GOTO": chrome.tabs.update(tab.id, { url: val }); responseText = `Opening ${val}`; break;
-          case "SCROLL": case "CLICK": case "TYPE": chrome.tabs.sendMessage(tab.id, { action: "performAction", type: action, value: val }); responseText = `${action}ing...`; break;
+          case "SCROLL": case "CLICK": case "TYPE": chrome.tabs.sendMessage(tab.id, { action: "performAction", type: action, value: val }); responseText = `Performing ${action.toLowerCase()} action...`; break;
           case "NOTIFY": chrome.notifications.create({ type: "basic", iconUrl: "/icons/icon128.png", title: "Geminify", message: val }); break;
         }
       }
@@ -196,8 +196,8 @@ const App = () => {
 
       // Add to Session History (keep last 20)
       const newHistory = [
-        ...chatHistory, 
-        { role: "user", text: userInput, timestamp: Date.now() }, 
+        ...chatHistory,
+        { role: "user", text: userInput, timestamp: Date.now() },
         { role: "assistant", text: resText, timestamp: Date.now() }
       ].slice(-20);
       setChatHistory(newHistory);
@@ -210,11 +210,11 @@ const App = () => {
         setTimeout(() => setCopyStatus("Copy"), 2000);
       }
 
-    } catch (err) { 
-      setResponse(`**Error:** ${err.message}`); 
+    } catch (err) {
+      setResponse(`**Error:** ${err.message}`);
       console.error("Geminify error:", err);
-    } finally { 
-      setIsSending(false); 
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -230,7 +230,7 @@ const App = () => {
    * Updates the category of an existing saved page.
    */
   const handleUpdateCategory = (timestamp, newCategory) => {
-    const updated = savedPages.map(page => 
+    const updated = savedPages.map(page =>
       page.timestamp === timestamp ? { ...page, category: newCategory } : page
     );
     // Persist changes to local storage
@@ -248,13 +248,13 @@ const App = () => {
       function: () => {
         const documentText = document.body.innerText;
         let allValues = "";
-        
+
         // Extract basic form values for better multi-step context
         document.querySelectorAll("input, textarea, select").forEach((element) => {
           if (["password", "email", "hidden", "file"].includes(element.type)) return;
           let name = element.name || "";
           let value = element.value || "";
-          
+
           if (!name) {
             let parentLoopIndex = 0, parentElement = element;
             while (parentLoopIndex < 10) {
@@ -265,7 +265,7 @@ const App = () => {
               parentLoopIndex++;
             }
           }
-          
+
           if (element.tagName === "SELECT") {
             value = element.options[element.selectedIndex]?.innerText || "";
           }
@@ -276,7 +276,7 @@ const App = () => {
       },
     }, (results) => {
       const text = results && results[0] ? (results[0].result || "") : "";
-      
+
       if (text) {
         const maxChars = isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
         setSelectedText(text.substring(0, maxChars));
@@ -309,7 +309,7 @@ const App = () => {
     setContextStack([]);
 
     // 2. Persist to storage
-    chrome.storage.sync.set({ 
+    chrome.storage.sync.set({
       selectedText: NO_CONTEXT_TEXT,
       userInput: "",
       response: "No response yet.",
@@ -359,19 +359,19 @@ const App = () => {
   // --- RENDER ---
   return (
     <div className={`app-container ${isDarkMode ? "dark-theme" : ""}`}>
-      
+
       {/* HEADER SECTION */}
       <header>
         <div className="header-top">
           <div className="logo-text">GEMINI<span>FY</span></div>
-          <span style={{ 
-            width: "8px", 
-            height: "8px", 
-            borderRadius: "50%", 
-            background: googleApiKey ? "#10b981" : "#f43f5e" 
+          <span style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            background: googleApiKey ? "#10b981" : "#f43f5e"
           }}></span>
         </div>
-        
+
         <div className="tabs-nav">
           <button className={`tab-btn ${activeTab === "chat" ? "active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
           <button className={`tab-btn ${activeTab === "pages" ? "active" : ""}`} onClick={() => setActiveTab("pages")}>My Pages</button>
@@ -382,7 +382,7 @@ const App = () => {
       {/* TAB: CHAT INTERFACE */}
       {activeTab === "chat" && (
         <div className="section">
-          
+
           <div className="card">
             <div className="label-row">
               <label>Page Context</label>
@@ -402,11 +402,11 @@ const App = () => {
 
           <div className="card">
             <label>Ask Gemini</label>
-            <textarea 
-              placeholder="Ask about this page..." 
-              value={userInput} 
-              onChange={(e) => { setUserInput(e.target.value); chrome.storage.sync.set({ userInput: e.target.value }); }} 
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()} 
+            <textarea
+              placeholder="Ask about this page..."
+              value={userInput}
+              onChange={(e) => { setUserInput(e.target.value); chrome.storage.sync.set({ userInput: e.target.value }); }}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
             />
             <div style={{ display: "flex", gap: "10px" }}>
               <button className="btn-primary" style={{ flex: 1 }} disabled={isSending || !googleApiKey} onClick={handleSend}>
@@ -426,18 +426,18 @@ const App = () => {
                   <a href="#" className="small-link" onClick={() => setIsEditMode(!isEditMode)}>
                     {isEditMode ? "View" : "Code"}
                   </a>
-                  <a href="#" className="small-link" onClick={() => { 
-                    navigator.clipboard.writeText(response); 
-                    setCopyStatus("Copied!"); 
-                    setTimeout(() => setCopyStatus("Copy"), 2000); 
+                  <a href="#" className="small-link" onClick={() => {
+                    navigator.clipboard.writeText(response);
+                    setCopyStatus("Copied!");
+                    setTimeout(() => setCopyStatus("Copy"), 2000);
                   }}>{copyStatus}</a>
                 </div>
               </div>
               {isEditMode ? (
-                <textarea 
-                  className="response-content-edit" 
-                  value={response} 
-                  readOnly 
+                <textarea
+                  className="response-content-edit"
+                  value={response}
+                  readOnly
                   style={{ background: "#f8fafc", fontFamily: "monospace", fontSize: "0.8rem" }}
                 />
               ) : (
@@ -458,7 +458,7 @@ const App = () => {
               ))}
             </div>
           )}
-          
+
         </div>
       )}
 
@@ -467,19 +467,19 @@ const App = () => {
         <div className="section">
           {/* SEARCH & FILTERS */}
           <div className="search-container">
-            <input 
-              type="text" 
-              placeholder="Search in library..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
+            <input
+              type="text"
+              placeholder="Search in library..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
             />
           </div>
 
           <div className="category-tabs">
             {["All", "Insight", "Dev", "News", "Social", "Media", "Search"].map(cat => (
-              <button 
-                key={cat} 
+              <button
+                key={cat}
                 className={`category-tag ${activeCategory === cat ? "active" : ""}`}
                 onClick={() => setActiveCategory(cat)}
               >
@@ -492,26 +492,26 @@ const App = () => {
             <label>Library (Last 40 Pages)</label>
             <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: "600" }}>{savedPages.length}/40</span>
           </div>
-          
+
           {savedPages.filter(p => {
             const matchesCat = activeCategory === "All" || p.category === activeCategory;
-            const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                 p.summary.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              p.summary.toLowerCase().includes(searchTerm.toLowerCase());
             return matchesCat && matchesSearch;
-          }).length > 0 ? 
+          }).length > 0 ?
             savedPages
               .filter(p => {
                 const matchesCat = activeCategory === "All" || p.category === activeCategory;
-                const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                     p.summary.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  p.summary.toLowerCase().includes(searchTerm.toLowerCase());
                 return matchesCat && matchesSearch;
               })
               .map(page => (
                 <div className="card" key={page.timestamp} style={{ gap: "8px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px", maxWidth: "80%" }}>
-                      <select 
-                        className="badge-category-select" 
+                      <select
+                        className="badge-category-select"
                         value={page.category || "Insight"}
                         onChange={(e) => handleUpdateCategory(page.timestamp, e.target.value)}
                       >
@@ -527,41 +527,41 @@ const App = () => {
                       Delete
                     </a>
                   </div>
-                  <div 
-                    className="context-box" 
-                    style={{ background: "white", border: "none", fontStyle: "normal", padding: "0" }} 
-                    dangerouslySetInnerHTML={{ __html: marked.parse(page.summary) }} 
+                  <div
+                    className="context-box"
+                    style={{ background: "white", border: "none", fontStyle: "normal", padding: "0" }}
+                    dangerouslySetInnerHTML={{ __html: marked.parse(page.summary) }}
                   />
                 </div>
-            )) : (
+              )) : (
               <div className="card" style={{ textAlign: "center", fontStyle: "italic", padding: "40px" }}>
                 No pages found {activeCategory !== "All" ? `in ${activeCategory}` : "yet"}.
               </div>
             )}
-          
+
         </div>
       )}
 
       {/* TAB: SETTINGS & CONFIG */}
       {activeTab === "settings" && (
         <div className="section">
-          
+
           <div className="card">
             <label>API Setup</label>
             <input type="text" placeholder="Gemini API Key" value={googleApiKey} onChange={(e) => setGoogleApiKey(e.target.value)} />
-            <button className="btn-primary" onClick={() => { 
-              chrome.storage.sync.set({ googleApiKey }, () => { 
-                alert("Saved!"); 
-                fetchModels(googleApiKey); 
-              }); 
+            <button className="btn-primary" onClick={() => {
+              chrome.storage.sync.set({ googleApiKey }, () => {
+                alert("Saved!");
+                fetchModels(googleApiKey);
+              });
             }}>Save Key</button>
           </div>
 
           <div className="card">
             <label>Model Configuration</label>
-            <select value={selectedModel} onChange={(e) => { 
-              setSelectedModel(e.target.value); 
-              chrome.storage.sync.set({ selectedModel: e.target.value }); 
+            <select value={selectedModel} onChange={(e) => {
+              setSelectedModel(e.target.value);
+              chrome.storage.sync.set({ selectedModel: e.target.value });
             }}>
               {isLoadingModels ? (
                 <option>Loading...</option>
@@ -580,13 +580,13 @@ const App = () => {
                 <span style={{ fontSize: "0.7rem", color: isFreePlan ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
                   {isFreePlan ? "ON" : "OFF"}
                 </span>
-                <input 
-                  type="checkbox" 
-                  checked={isFreePlan} 
-                  onChange={(e) => { 
-                    setIsFreePlan(e.target.checked); 
-                    chrome.storage.sync.set({ isFreePlan: e.target.checked }); 
-                  }} 
+                <input
+                  type="checkbox"
+                  checked={isFreePlan}
+                  onChange={(e) => {
+                    setIsFreePlan(e.target.checked);
+                    chrome.storage.sync.set({ isFreePlan: e.target.checked });
+                  }}
                   style={{ width: "auto", cursor: "pointer" }}
                 />
               </div>
@@ -603,13 +603,13 @@ const App = () => {
                 <span style={{ fontSize: "0.7rem", color: !useAiSummaries ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
                   {!useAiSummaries ? "ON" : "OFF"}
                 </span>
-                <input 
-                  type="checkbox" 
-                  checked={!useAiSummaries} 
-                  onChange={(e) => { 
-                    setUseAiSummaries(!e.target.checked); 
-                    chrome.storage.sync.set({ useAiSummaries: !e.target.checked }); 
-                  }} 
+                <input
+                  type="checkbox"
+                  checked={!useAiSummaries}
+                  onChange={(e) => {
+                    setUseAiSummaries(!e.target.checked);
+                    chrome.storage.sync.set({ useAiSummaries: !e.target.checked });
+                  }}
                   style={{ width: "auto", cursor: "pointer" }}
                 />
               </div>
@@ -626,13 +626,13 @@ const App = () => {
                 <span style={{ fontSize: "0.7rem", color: autoCopy ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
                   {autoCopy ? "ON" : "OFF"}
                 </span>
-                <input 
-                  type="checkbox" 
-                  checked={autoCopy} 
-                  onChange={(e) => { 
-                    setAutoCopy(e.target.checked); 
-                    chrome.storage.sync.set({ autoCopy: e.target.checked }); 
-                  }} 
+                <input
+                  type="checkbox"
+                  checked={autoCopy}
+                  onChange={(e) => {
+                    setAutoCopy(e.target.checked);
+                    chrome.storage.sync.set({ autoCopy: e.target.checked });
+                  }}
                   style={{ width: "auto", cursor: "pointer" }}
                 />
               </div>
@@ -646,13 +646,13 @@ const App = () => {
                 <span style={{ fontSize: "0.7rem", color: isDarkMode ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
                   {isDarkMode ? "ON" : "OFF"}
                 </span>
-                <input 
-                  type="checkbox" 
-                  checked={isDarkMode} 
-                  onChange={(e) => { 
-                    setIsDarkMode(e.target.checked); 
-                    chrome.storage.sync.set({ isDarkMode: e.target.checked }); 
-                  }} 
+                <input
+                  type="checkbox"
+                  checked={isDarkMode}
+                  onChange={(e) => {
+                    setIsDarkMode(e.target.checked);
+                    chrome.storage.sync.set({ isDarkMode: e.target.checked });
+                  }}
                   style={{ width: "auto", cursor: "pointer" }}
                 />
               </div>
@@ -676,17 +676,17 @@ const App = () => {
 
           <div className="card">
             <label>Default Refine Rules</label>
-            <textarea 
-              placeholder="e.g. 'Fix grammar and style...'" 
-              value={refineCustomPrompt} 
-              onChange={(e) => setRefineCustomPrompt(e.target.value)} 
-              style={{ minHeight: "60px" }} 
+            <textarea
+              placeholder="e.g. 'Fix grammar and style...'"
+              value={refineCustomPrompt}
+              onChange={(e) => setRefineCustomPrompt(e.target.value)}
+              style={{ minHeight: "60px" }}
             />
-            <button className="btn-primary" onClick={() => { 
-              chrome.storage.sync.set({ refineCustomPrompt }, () => alert("Saved!")); 
+            <button className="btn-primary" onClick={() => {
+              chrome.storage.sync.set({ refineCustomPrompt }, () => alert("Saved!"));
             }}>Update Rules</button>
           </div>
-          
+
         </div>
       )}
 

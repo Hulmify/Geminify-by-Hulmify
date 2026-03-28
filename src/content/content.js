@@ -298,9 +298,81 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // --- ACTION: Perform Browser Automation ---
   } else if (message.action === "performAction") {
     const { type, value } = message;
+    
+    // Clear any existing periodic automation if a new one starts
+    if (window._geminifyInterval) {
+      clearInterval(window._geminifyInterval);
+      window._geminifyInterval = null;
+    }
+    document.getElementById("geminify-automation-capsule")?.remove();
+
     try {
       if (type === "SCROLL") {
-        window.scrollBy({ top: value === "down" ? 500 : -500, behavior: "smooth" });
+        const isEvery = value.toLowerCase().includes("every");
+        const direction = value.toLowerCase().includes("up") ? "up" : "down";
+        
+        const doScroll = () => {
+          window.scrollBy({ top: direction === "down" ? 500 : -500, behavior: "smooth" });
+        };
+
+        if (isEvery) {
+          const timeMatch = value.match(/(\d+)\s*(s|sec|min|minute|second)/i);
+          const amount = timeMatch ? parseInt(timeMatch[1]) : 1;
+          const unit = timeMatch ? timeMatch[2].toLowerCase() : "min";
+          const intervalMs = (unit.startsWith("s")) ? amount * 1000 : amount * 60 * 1000;
+
+          // Initial scroll
+          doScroll();
+
+          // Set interval
+          window._geminifyInterval = setInterval(doScroll, intervalMs);
+
+          // Show floating automation capsule
+          const capsule = document.createElement("div");
+          capsule.id = "geminify-automation-capsule";
+          capsule.style = `
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            z-index: 2147483647;
+            animation: capsuleFadeIn 0.3s ease;
+          `;
+          
+          capsule.innerHTML = `
+            <span style="display:flex; align-items:center; gap:6px;">
+              <span style="width:8px; height:8px; background:#10b981; border-radius:50%; animation: pulse 1.5s infinite;"></span>
+              Scrolling ${direction} every ${amount} ${unit.startsWith("s") ? "s" : "min"}
+            </span>
+            <button id="stop-geminify-automation" style="background:rgba(255,255,255,0.1); border:none; color:white; padding:4px 10px; border-radius:12px; cursor:pointer; font-size:11px; font-weight:700;">STOP</button>
+          `;
+
+          const style = document.createElement("style");
+          style.innerHTML = `
+            @keyframes capsuleFadeIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+            @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+          `;
+          document.head.appendChild(style);
+          document.body.appendChild(capsule);
+
+          document.getElementById("stop-geminify-automation").onclick = () => {
+            clearInterval(window._geminifyInterval);
+            capsule.remove();
+          };
+        } else {
+          doScroll();
+        }
       } else if (type === "CLICK") {
         const el = document.querySelector(value);
         if (el) {
