@@ -8,6 +8,9 @@
 
 - **Instant Summarization**: Get the gist of any webpage in seconds.
 - **Contextual Chat**: Ask questions about the current page and get real-time AI responses.
+- **Multimodal Analysis**: Capture page screenshots or attach PDFs for advanced visual and document analysis.
+- **Custom Prompt Templates**: Save and reuse your favorite prompts for quick access.
+- **Text Refinement**: Use the right-click context menu to fix grammar, make text professional, or change tone in editable fields.
 - **Web Insights**: Organize and extract key insights from your browsing with ease.
 - **Context Menu Integration**: Right-click to trigger actions on selected text.
 - **Modern UI**: A clean, React-powered, responsive popup interface.

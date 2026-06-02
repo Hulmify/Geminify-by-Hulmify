@@ -1,7 +1,7 @@
 {
     "name": "geminify",
     "version": "1.63",
-    "description": "",
+    "description": "Summarize pages, chat with context, and organize web insights instantly using the power of Google Gemini AI.",
     "main": "ui/popup.js",
     "scripts": {
         "build": "webpack --mode production",
