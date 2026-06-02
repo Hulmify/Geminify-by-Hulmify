@@ -2,7 +2,8 @@
 
 **Geminify** is a powerful AI browser assistant built on Google's Gemini Flash model. Summarize pages, chat with context, and organize web insights instantly—directly within your browser.
 
-![geminify_ss](https://lh3.googleusercontent.com/iyzcDJuomO8rKjnIgG4cBcHBb3-dc6dM0F7v_3anYJELJwQrFwVJF6fE-WenzcKfatTtm4IArifrvZKRp_S08Hwi=s1280-w1280-h800)
+<img width="1280" height="800" alt="Banner Geminify" src="https://github.com/user-attachments/assets/7f9f43f2-78da-42d0-932e-919d5629faff" />
+
 
 ## 🚀 Key Features
 
