@@ -306,7 +306,40 @@ function addStyles() {
  * @param {string} model  - Target model ID.
  * @returns {Promise<string>} The response text.
  */
-const callGemini = async (prompt, apiKey) => {
+/**
+ * Generic helper to call the configured AI provider (non-streaming).
+ * Reads aiProvider + keys from storage data object passed by caller.
+ *
+ * @param {string} prompt   - The prompt to send.
+ * @param {string} apiKey   - Google API Key (used when provider is "gemini").
+ * @param {Object} [opts]   - Optional: { aiProvider, openrouterApiKey }
+ * @returns {Promise<string>} The response text.
+ */
+const callAI = async (prompt, apiKey, opts = {}) => {
+  const provider = opts.aiProvider || "gemini";
+
+  if (provider === "openrouter") {
+    const orKey = opts.openrouterApiKey || "";
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${orKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://hulmify.com",
+        "X-Title": "Geminify by Hulmify",
+      },
+      body: JSON.stringify({
+        model: opts.openrouterModel || "google/gemini-2.5-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+      }),
+    });
+    if (!response.ok) throw new Error("OpenRouter API request failed");
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content || "No response.";
+  }
+
+  // Default: Google Gemini
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
   const response = await fetch(endpoint, {
     method: "POST",
@@ -317,6 +350,9 @@ const callGemini = async (prompt, apiKey) => {
   const data = await response.json();
   return data?.candidates[0]?.content?.parts[0]?.text || "No response.";
 };
+
+// Keep backward-compatible alias used internally
+const callGemini = (prompt, apiKey) => callAI(prompt, apiKey);
 
 // ─────────────────────────────────────────────
 // SECTION 4: PAGE CATEGORIZATION & SAVING
@@ -467,8 +503,9 @@ function handleToolbarAction(text, tone) {
 
   addBox(anchor, "Thinking...", { title: "Geminify" });
 
-  chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "isFreePlan"], async (data) => {
-    if (!data.googleApiKey) {
+  chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
+    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+    if (!activeKey) {
       addBox(anchor, "No API key set. Open Geminify settings to add your key.");
       return;
     }
@@ -483,14 +520,14 @@ function handleToolbarAction(text, tone) {
     const freeTierNote = data.isFreePlan ? " (Be extremely concise.)" : "";
 
     try {
-      const result = await callGemini(
+      const result = await callAI(
         `${systemPrompt}${freeTierNote}\n\nText:\n${text}`,
         data.googleApiKey,
-        data.selectedModel
+        { aiProvider: data.aiProvider, openrouterApiKey: data.openrouterApiKey, openrouterModel: data.openrouterModel }
       );
       addBox(anchor, result, { title: tone === "explain" ? "Explanation" : tone === "grammar" ? "Fixed Text" : "Summary" });
     } catch (err) {
-      addBox(anchor, "Error: Could not reach Gemini. Check your API key.");
+      addBox(anchor, "Error: Could not reach AI provider. Check your API key.");
     }
   });
 }
@@ -617,11 +654,12 @@ async function activateReadingMode() {
   });
 
   // ── Generate AI summary ───────────────────────────
-  chrome.storage.sync.get(["googleApiKey", "isFreePlan"], async (data) => {
+  chrome.storage.sync.get(["googleApiKey", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
     const summaryEl = document.getElementById("geminify-reading-summary");
     if (!summaryEl) return;
 
-    if (!data.googleApiKey) {
+    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+    if (!activeKey) {
       summaryEl.innerHTML = `<p style="color:#94a3b8;font-size:0.8rem;">Set your API key in Geminify settings to generate AI summaries.</p>`;
       return;
     }
@@ -633,9 +671,10 @@ async function activateReadingMode() {
         ? "Provide a TL;DR (1 sentence) and 3 bullet points."
         : "Provide: 1) TL;DR (2 sentences), 2) Key Takeaways (4-5 bullets), 3) One open question.";
 
-      const summary = await callGemini(
+      const summary = await callAI(
         `You are a reading assistant. Analyze this page and ${brevity}\n\nURL: ${window.location.href}\nTitle: ${document.title}\n\nContent:\n${pageText}`,
-        data.googleApiKey
+        data.googleApiKey,
+        { aiProvider: data.aiProvider, openrouterApiKey: data.openrouterApiKey, openrouterModel: data.openrouterModel }
       );
 
       if (document.getElementById("geminify-reading-summary")) {
@@ -662,16 +701,18 @@ function handleParagraphClick(para) {
   const paraText = para.innerText.trim().substring(0, 600);
   addBox(para, "Analysing paragraph...", { title: "Paragraph Insight" });
 
-  chrome.storage.sync.get(["googleApiKey", "isFreePlan"], async (data) => {
-    if (!data.googleApiKey) {
+  chrome.storage.sync.get(["googleApiKey", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
+    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+    if (!activeKey) {
       addBox(para, "No API key set.");
       return;
     }
 
     try {
-      const result = await callGemini(
+      const result = await callAI(
         `Explain this paragraph clearly and highlight any key insight, claim, or implication in 2-3 sentences:\n\n"${paraText}"`,
-        data.googleApiKey
+        data.googleApiKey,
+        { aiProvider: data.aiProvider, openrouterApiKey: data.openrouterApiKey, openrouterModel: data.openrouterModel }
       );
       addBox(para, result, { title: "Paragraph Insight" });
     } catch {
@@ -711,8 +752,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     addStyles();
     addBox(element, "Thinking...");
 
-    chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "isFreePlan"], async (data) => {
-      if (!data.googleApiKey) {
+    chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
+      const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+      if (!activeKey) {
         addBox(element, "API Key missing. Set it in Geminify Settings.");
         return;
       }
@@ -729,13 +771,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       try {
         const freeTierNote = data.isFreePlan ? " (Be extremely concise.)" : "";
-        const refined = await callGemini(
+        const refined = await callAI(
           `${systemPrompt}${freeTierNote}\n\nText: ${originalText}`,
-          data.googleApiKey
+          data.googleApiKey,
+          { aiProvider: data.aiProvider, openrouterApiKey: data.openrouterApiKey, openrouterModel: data.openrouterModel }
         );
         addBox(element, refined, { title: "Refined Text" });
       } catch {
-        addBox(element, "Error: Could not reach Gemini. Check your API key.");
+        addBox(element, "Error: Could not reach AI provider. Check your API key.");
       }
     });
 
@@ -748,7 +791,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     floatingStatus.innerText = "Summarizing Page...";
     document.body.appendChild(floatingStatus);
 
-    chrome.storage.sync.get(["googleApiKey", "isFreePlan", "useAiSummaries"], async (data) => {
+    chrome.storage.sync.get(["googleApiKey", "isFreePlan", "useAiSummaries", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
       if (data.useAiSummaries === false) {
         const localSummary = extractLocalSummary();
         saveSummaryToStorage(localSummary);
@@ -757,7 +800,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      if (!data.googleApiKey) {
+      const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+      if (!activeKey) {
         floatingStatus.innerText = "Set API Key first";
         setTimeout(() => floatingStatus.remove(), 3000);
         return;
@@ -768,9 +812,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const pageText = document.body.innerText.substring(0, limit);
         const brevity = data.isFreePlan ? " Provide 2-3 extremely concise bullet points max." : " Provide 3-5 concise bullet points.";
 
-        const summary = await callGemini(
+        const summary = await callAI(
           `Summarize the following webpage content professionally.${brevity} Provide a title first.\n\nURL: ${window.location.href}\nTitle: ${document.title}\n\nContent:\n${pageText}`,
-          data.googleApiKey
+          data.googleApiKey,
+          { aiProvider: data.aiProvider, openrouterApiKey: data.openrouterApiKey, openrouterModel: data.openrouterModel }
         );
         saveSummaryToStorage(summary);
         floatingStatus.innerText = "Page Saved!";

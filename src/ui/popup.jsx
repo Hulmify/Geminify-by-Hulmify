@@ -110,7 +110,12 @@ const App = () => {
   const [newTemplateName, setNewTemplateName]   = useState("");
 
   // ── Configuration ────────────────────────────
-  const [googleApiKey, setGoogleApiKey]     = useState("");
+  const [googleApiKey, setGoogleApiKey]         = useState("");
+  const [openrouterApiKey, setOpenrouterApiKey] = useState("");
+  const [aiProvider, setAiProvider]             = useState("gemini"); // "gemini" | "openrouter"
+  const [openrouterModel, setOpenrouterModel]   = useState("google/gemini-2.5-flash-preview");
+  const [openrouterModels, setOpenrouterModels] = useState([]);   // fetched multimodal models
+  const [modelsLoading, setModelsLoading]       = useState(false);
   const [refineCustomPrompt, setRefineCustomPrompt] = useState("");
   const [isFreePlan, setIsFreePlan]         = useState(false);
   const [useAiSummaries, setUseAiSummaries] = useState(false);
@@ -155,13 +160,16 @@ const App = () => {
   useEffect(() => {
     // Load all persisted settings
     chrome.storage.sync.get(
-      ["selectedText", "googleApiKey", "refineCustomPrompt",
+      ["selectedText", "googleApiKey", "openrouterApiKey", "aiProvider", "openrouterModel", "refineCustomPrompt",
        "response", "userInput", "isFreePlan", "useAiSummaries", "autoCopy",
        "isDarkMode", "customCategories", "contextStack", "promptTemplates"],
       (data) => {
         const maxChars = data.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
         if (data.selectedText)        setSelectedText(data.selectedText.substring(0, maxChars));
         if (data.googleApiKey)        setGoogleApiKey(data.googleApiKey);
+        if (data.openrouterApiKey)    setOpenrouterApiKey(data.openrouterApiKey);
+        if (data.aiProvider)          setAiProvider(data.aiProvider);
+        if (data.openrouterModel)     setOpenrouterModel(data.openrouterModel);
         if (data.refineCustomPrompt)  setRefineCustomPrompt(data.refineCustomPrompt);
         if (data.response)            setResponse(data.response);
         if (data.userInput)           setUserInput(data.userInput);
@@ -183,25 +191,58 @@ const App = () => {
 
     // Reactive storage listener
     const storageListener = (changes) => {
-      if (changes.savedPages)       setSavedPages(changes.savedPages.newValue);
+      if (changes.savedPages)         setSavedPages(changes.savedPages.newValue);
       if (changes.selectedText) {
         chrome.storage.sync.get(["isFreePlan"], (d) => {
           const max = d.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
           setSelectedText(changes.selectedText.newValue.substring(0, max));
         });
       }
-      if (changes.isFreePlan)       setIsFreePlan(changes.isFreePlan.newValue);
-      if (changes.useAiSummaries)   setUseAiSummaries(changes.useAiSummaries.newValue);
-      if (changes.autoCopy)         setAutoCopy(changes.autoCopy.newValue);
-      if (changes.isDarkMode)       setIsDarkMode(changes.isDarkMode.newValue);
-      if (changes.customCategories) setCustomCategories(changes.customCategories.newValue);
-      if (changes.contextStack)     setContextStack(changes.contextStack.newValue);
-      if (changes.promptTemplates)  setPromptTemplates(changes.promptTemplates.newValue);
+      if (changes.isFreePlan)         setIsFreePlan(changes.isFreePlan.newValue);
+      if (changes.useAiSummaries)     setUseAiSummaries(changes.useAiSummaries.newValue);
+      if (changes.autoCopy)           setAutoCopy(changes.autoCopy.newValue);
+      if (changes.isDarkMode)         setIsDarkMode(changes.isDarkMode.newValue);
+      if (changes.customCategories)   setCustomCategories(changes.customCategories.newValue);
+      if (changes.contextStack)       setContextStack(changes.contextStack.newValue);
+      if (changes.promptTemplates)    setPromptTemplates(changes.promptTemplates.newValue);
+      if (changes.openrouterApiKey)   setOpenrouterApiKey(changes.openrouterApiKey.newValue);
+      if (changes.aiProvider)         setAiProvider(changes.aiProvider.newValue);
+      if (changes.openrouterModel)    setOpenrouterModel(changes.openrouterModel.newValue);
     };
 
     chrome.storage.onChanged.addListener(storageListener);
     return () => chrome.storage.onChanged.removeListener(storageListener);
   }, []);
+
+  // Fetch multimodal models from OpenRouter whenever the provider is switched to openrouter
+  useEffect(() => {
+    if (aiProvider !== "openrouter" || openrouterModels.length > 0) return;
+    setModelsLoading(true);
+    fetch("https://openrouter.ai/api/v1/models")
+      .then(r => r.json())
+      .then(data => {
+        const multimodal = (data?.data || [])
+          .filter(m => {
+            const mods = m.architecture?.input_modalities || [];
+            // Require image support, but allow models without file support
+            return mods.includes("image");
+          })
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(m => ({
+            id: m.id,
+            label: m.name,
+            supportsFile: m.architecture?.input_modalities?.includes("file") || false
+          }));
+        setOpenrouterModels(multimodal);
+        // Auto-select the first model if current selection isn't in the list
+        if (multimodal.length && !multimodal.find(m => m.id === openrouterModel)) {
+          setOpenrouterModel(multimodal[0].id);
+          chrome.storage.sync.set({ openrouterModel: multimodal[0].id });
+        }
+      })
+      .catch(() => showToast("Could not load OpenRouter models.", "error"))
+      .finally(() => setModelsLoading(false));
+  }, [aiProvider]);
 
   // ─────────────────────────────────────────────
   // MULTIMODAL HELPERS (Feature 4)
@@ -266,7 +307,11 @@ const App = () => {
   const handleSend = async () => {
     const hasContent = userInput.trim() || screenshotData || attachedPdf ||
       (selectedText && selectedText !== NO_CONTEXT_TEXT);
-    if (!hasContent || isSending || !googleApiKey) return;
+    const activeKey = aiProvider === "openrouter" ? openrouterApiKey.trim() : googleApiKey.trim();
+    if (!hasContent || isSending || !activeKey) {
+      if (!activeKey) showToast(aiProvider === "openrouter" ? "Enter & save your OpenRouter API key in Settings." : "Enter & save your Gemini API key in Settings.", "error");
+      return;
+    }
 
     setIsSending(true);
     setIsStreaming(true);
@@ -301,21 +346,66 @@ Context: ${fullContext || "No context provided."}`;
 
       const contents = [...historyTurns, { role: "user", parts: userParts }];
 
-      // We are standardizing on the latest Gemini Flash
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse`;
+      let res;
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "x-goog-api-key": googleApiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemText }] },
-          contents
-        }),
-      });
+      if (aiProvider === "openrouter") {
+        // ── OpenRouter (OpenAI-compatible streaming) ──────────────────────
+        // Some providers (incl. Google via OpenRouter) reject a standalone
+        // system message, so we prepend the system prompt to the first user
+        // message instead, which is universally supported.
+        const historyMessages = chatHistory.map(msg => ({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: msg.text,
+        }));
+
+        // Assemble user content parts (text + optional images)
+        const userContentParts = [];
+        const userText = userInput.trim() || "Please summarize neatly.";
+        // Prefix system context into the user text for broad model compatibility
+        userContentParts.push({ type: "text", text: `${systemText}\n\n---\n\n${userText}` });
+        if (screenshotData) userContentParts.push({ type: "image_url", image_url: { url: `data:image/png;base64,${screenshotData}` } });
+        if (attachedPdf)    userContentParts.push({ type: "text", text: `[PDF attached: ${attachedPdf.name} — please analyse it]` });
+
+        const openAiMessages = [
+          ...historyMessages,
+          // Use plain string when no attachments; array only when multimodal
+          { role: "user", content: userContentParts.length === 1 ? userContentParts[0].text : userContentParts },
+        ];
+
+        res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${activeKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://hulmify.com",
+            "X-Title": "Geminify by Hulmify",
+          },
+          body: JSON.stringify({
+            model: openrouterModel,
+            messages: openAiMessages,
+            stream: true,
+          }),
+        });
+      } else {
+        // ── Google Gemini (native SSE) ────────────────────────────────────
+        res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse`,
+          {
+            method: "POST",
+            headers: { "x-goog-api-key": googleApiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemText }] },
+              contents
+            }),
+          }
+        );
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `API error: ${res.status}`);
+        // Surface the provider's raw error detail when available
+        const detail = errData?.error?.metadata?.raw || errData?.error?.message || `API error: ${res.status}`;
+        throw new Error(detail);
       }
 
       // Stream tokens
@@ -334,7 +424,10 @@ Context: ${fullContext || "No context provided."}`;
           if (!jsonStr || jsonStr === "[DONE]") continue;
           try {
             const json = JSON.parse(jsonStr);
-            const token = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            // OpenRouter uses OpenAI delta format; Gemini uses candidates
+            const token = aiProvider === "openrouter"
+              ? (json?.choices?.[0]?.delta?.content || "")
+              : (json?.candidates?.[0]?.content?.parts?.[0]?.text || "");
             accumulated += token;
             setResponse(accumulated);
           } catch { /* partial chunk — continue */ }
@@ -536,6 +629,14 @@ Context: ${fullContext || "No context provided."}`;
   );
 
   const hasAttachment = !!(screenshotData || attachedPdf);
+  const supportsPdf = aiProvider === "gemini" || (aiProvider === "openrouter" && openrouterModels.find(m => m.id === openrouterModel)?.supportsFile);
+  
+  // Clear PDF attachment if model doesn't support it
+  useEffect(() => {
+    if (!supportsPdf && attachedPdf) {
+      setAttachedPdf(null);
+    }
+  }, [supportsPdf, attachedPdf]);
 
   // ─────────────────────────────────────────────
   // RENDER
@@ -558,7 +659,7 @@ Context: ${fullContext || "No context provided."}`;
       <header>
         <div className="header-top">
           <div className="logo-text">GEMINI<span>FY</span></div>
-          <span className={`status-dot ${googleApiKey ? "status-dot--online" : "status-dot--offline"}`} />
+          <span className={`status-dot ${(aiProvider === "openrouter" ? openrouterApiKey : googleApiKey) ? "status-dot--online" : "status-dot--offline"}`} />
         </div>
         <div className="tabs-nav">
           <button className={`tab-btn ${activeTab === "chat"     ? "active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
@@ -660,16 +761,20 @@ Context: ${fullContext || "No context provided."}`;
                 {screenshotData && <Icon.Check />}
               </button>
 
-              <button
-                className={`attach-btn ${attachedPdf ? "attach-btn--active" : ""}`}
-                onClick={() => attachedPdf ? clearAttachments() : pdfInputRef.current?.click()}
-                title="Attach a PDF for analysis"
-              >
-                <Icon.File />
-                {attachedPdf ? `${attachedPdf.name.substring(0, 12)}…` : "PDF"}
-                {attachedPdf && <Icon.Check />}
-              </button>
-              <input ref={pdfInputRef} type="file" hidden accept=".pdf,application/pdf" onChange={handlePdfAttach} />
+              {supportsPdf && (
+                <>
+                  <button
+                    className={`attach-btn ${attachedPdf ? "attach-btn--active" : ""}`}
+                    onClick={() => attachedPdf ? clearAttachments() : pdfInputRef.current?.click()}
+                    title="Attach a PDF for analysis"
+                  >
+                    <Icon.File />
+                    {attachedPdf ? `${attachedPdf.name.substring(0, 12)}…` : "PDF"}
+                    {attachedPdf && <Icon.Check />}
+                  </button>
+                  <input ref={pdfInputRef} type="file" hidden accept=".pdf,application/pdf" onChange={handlePdfAttach} />
+                </>
+              )}
 
               {hasAttachment && (
                 <button className="attach-btn attach-btn--clear" onClick={clearAttachments}>
@@ -683,7 +788,7 @@ Context: ${fullContext || "No context provided."}`;
               <button
                 className="btn-primary"
                 style={{ flex: 1 }}
-                disabled={!isStreaming && (isSending || !googleApiKey)}
+                disabled={!isStreaming && (isSending || !(aiProvider === "openrouter" ? openrouterApiKey : googleApiKey))}
                 onClick={isStreaming ? handleStop : handleSend}
               >
                 {isStreaming
@@ -827,13 +932,101 @@ Context: ${fullContext || "No context provided."}`;
         <div className="section">
 
           <div className="card">
-            <label>API Setup</label>
-            <input type="text" placeholder="Gemini API Key" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} />
-            <button className="btn-primary" onClick={() => {
-              chrome.storage.sync.set({ googleApiKey }, () => {
-                showToast("API key saved!");
-              });
-            }}>Save Key</button>
+            <label>AI Provider</label>
+            <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "0 0 8px" }}>
+              Both providers use the latest Gemini Flash model. OpenRouter routes via its API gateway.
+            </p>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+              {[{ id: "gemini", label: "Google Gemini" }, { id: "openrouter", label: "OpenRouter" }].map(p => (
+                <button
+                  key={p.id}
+                  className="btn-primary"
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    fontSize: "0.82rem",
+                    background: aiProvider === p.id ? undefined : "#f1f5f9",
+                    color: aiProvider === p.id ? undefined : "#64748b",
+                    boxShadow: aiProvider === p.id ? undefined : "none",
+                  }}
+                  onClick={() => {
+                    setAiProvider(p.id);
+                    chrome.storage.sync.set({ aiProvider: p.id });
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {aiProvider === "gemini" ? (
+              <>
+                <input
+                  type="text"
+                  placeholder="Gemini API Key (from Google AI Studio)"
+                  value={googleApiKey}
+                  onChange={e => setGoogleApiKey(e.target.value)}
+                />
+                <button className="btn-primary" onClick={() => {
+                  chrome.storage.sync.set({ googleApiKey }, () => showToast("Gemini API key saved!"));
+                }}>Save Gemini Key</button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="OpenRouter API Key (from openrouter.ai)"
+                  value={openrouterApiKey}
+                  onChange={e => setOpenrouterApiKey(e.target.value)}
+                />
+                <button className="btn-primary" style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }} onClick={() => {
+                  chrome.storage.sync.set({ openrouterApiKey }, () => showToast("OpenRouter key saved!"));
+                }}>Save OpenRouter Key</button>
+
+                {/* Multimodal model selector */}
+                <div style={{ marginTop: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <label style={{ fontSize: "0.75rem", color: "#475569", fontWeight: "600" }}>Multimodal Model</label>
+                    {modelsLoading && <span style={{ fontSize: "0.68rem", color: "#a855f7" }}>Fetching…</span>}
+                    {!modelsLoading && openrouterModels.length > 0 && (
+                      <span style={{ fontSize: "0.68rem", color: "#94a3b8" }}>{openrouterModels.length} models</span>
+                    )}
+                  </div>
+                  {openrouterModels.length > 0 ? (
+                    <select
+                      value={openrouterModel}
+                      onChange={e => {
+                        setOpenrouterModel(e.target.value);
+                        chrome.storage.sync.set({ openrouterModel: e.target.value });
+                      }}
+                      style={{
+                        width: "100%", padding: "9px 12px", borderRadius: "10px",
+                        border: "1px solid #e2e8f0", fontSize: "0.82rem",
+                        background: "#f8fafc", color: "#1e293b", cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {openrouterModels.map(m => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  ) : !modelsLoading ? (
+                    <button
+                      className="btn-primary"
+                      style={{ background: "#f1f5f9", color: "#7c3aed", boxShadow: "none", fontSize: "0.8rem", padding: "8px" }}
+                      onClick={() => setOpenrouterModels([])}
+                    >
+                      Retry Loading Models
+                    </button>
+                  ) : null}
+                  {openrouterModel && (
+                    <p style={{ fontSize: "0.68rem", color: "#94a3b8", margin: "5px 0 0", wordBreak: "break-all" }}>
+                      Active: <strong style={{ color: "#7c3aed" }}>{openrouterModel}</strong>
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Toggle settings */}
@@ -919,7 +1112,9 @@ Context: ${fullContext || "No context provided."}`;
         </div>
       )}
 
-      <footer>Geminify by Hulmify &bull; Powered by Google Gemini &copy; 2026</footer>
+      <footer>
+        Geminify by Hulmify &bull; Powered by {aiProvider === "openrouter" ? "OpenRouter + Gemini Flash" : "Google Gemini"} &copy; 2026
+      </footer>
     </div>
   );
 };
