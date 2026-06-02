@@ -463,3 +463,244 @@ footer a {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
+
+/* ─────────────────────────────────────────────
+   NEW FEATURE STYLES (v2.0)
+───────────────────────────────────────────── */
+
+/* Status dot in header */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot--online  { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); }
+.status-dot--offline { background: #f43f5e; box-shadow: 0 0 0 3px rgba(244, 63, 94,  0.15); }
+
+/* Keyboard shortcut badge */
+.kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: var(--font-main);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0369a1;
+  letter-spacing: 0.02em;
+}
+
+/* ── Feature 1: Streaming cursor ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  background: var(--primary-color);
+  margin-left: 4px;
+  vertical-align: middle;
+  border-radius: 1px;
+  animation: blink 0.9s ease infinite;
+}
+
+/* Copy button — icon + text in response header */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+  line-height: 1;
+}
+.copy-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-color);
+}
+.copy-btn svg { flex-shrink: 0; }
+
+/* Toast icon alignment */
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.toast svg { vertical-align: middle; }
+
+/* SVG icon gap in pills and attach buttons */
+.template-pill,
+.attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.template-pill svg,
+.attach-btn svg { flex-shrink: 0; }
+
+/* Btn-primary icon alignment */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-primary svg { flex-shrink: 0; }
+
+/* ── Feature 3: Prompt Template Pills ── */
+.template-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.template-pill {
+  padding: 5px 11px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-medium);
+  border-radius: 100px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  font-family: inherit;
+}
+.template-pill:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  transform: translateY(-1px);
+}
+.template-pill--add {
+  border-style: dashed;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+}
+.template-pill--add:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+.template-save-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.template-save-row input {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
+.template-manager-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.template-manager-row:last-child { border-bottom: none; }
+
+/* ── Feature 4: Attachment Bar ── */
+.attachment-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.attach-btn {
+  padding: 6px 12px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.attach-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+.attach-btn--active {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #059669;
+}
+.attach-btn--clear {
+  border-color: #f43f5e;
+  color: #f43f5e;
+  background: #fff1f2;
+}
+.attach-btn--clear:hover {
+  background: #f43f5e;
+  color: white;
+}
+
+/* ── Toast Notification ── */
+.toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  animation: toastIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.toast--success { background: #1e293b; color: #f8fafc; }
+.toast--error   { background: #f43f5e; color: #ffffff; }
+
+/* ── Dark mode overrides for new components ── */
+.dark-theme .template-pill {
+  background: var(--bg-surface);
+  border-color: var(--border-medium);
+  color: var(--text-secondary);
+}
+.dark-theme .template-pill:hover {
+  background: rgba(72, 150, 191, 0.15);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+.dark-theme .attach-btn {
+  background: var(--bg-surface);
+  border-color: var(--border-medium);
+  color: var(--text-secondary);
+}
+.dark-theme .attach-btn--active { background: rgba(16, 185, 129, 0.12); }
+.dark-theme .attach-btn--clear  { background: rgba(244, 63, 94,  0.10); }
+.dark-theme .toast--success     { background: #334155; }
+.dark-theme textarea,
+.dark-theme input[type="text"],
+.dark-theme select {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}

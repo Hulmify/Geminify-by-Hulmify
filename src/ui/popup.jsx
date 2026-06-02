@@ -1,172 +1,316 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { marked } from "marked";
 
-// --- CONSTANTS ---
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+
 const NO_CONTEXT_TEXT = "The context is empty. Select some text on the page to provide context.";
 const MAX_CONTEXT_CHARS_DEFAULT = 12000;
-const MAX_CONTEXT_CHARS_FREE = 4000;
+const MAX_CONTEXT_CHARS_FREE    = 4000;
+
+/** Default prompt templates — IDs are stable so we can distinguish user-created ones. */
+const DEFAULT_TEMPLATES = [
+  { id: "tpl-explain",   label: "Explain",    icon: "explain",   prompt: "Explain this page clearly and simply, suitable for a general audience." },
+  { id: "tpl-summarize", label: "Summarize",  icon: "summarize", prompt: "Provide a structured summary: 1) What is this, 2) Key Points, 3) My Takeaway." },
+  { id: "tpl-keypoints", label: "Key Points", icon: "keypoints", prompt: "List the 5 most important points as concise bullet points." },
+  { id: "tpl-timeline",  label: "Timeline",   icon: "timeline",  prompt: "Extract all dates, events, and deadlines. Format as a chronological list." },
+  { id: "tpl-quiz",      label: "Quiz Me",    icon: "quiz",      prompt: "Generate 5 quiz questions based on this content to test my understanding." },
+  { id: "tpl-critique",  label: "Critique",   icon: "critique",  prompt: "Provide a balanced critique: what are the strengths and weaknesses of the argument here?" },
+];
+
+const DEFAULT_TEMPLATE_IDS = new Set(DEFAULT_TEMPLATES.map(t => t.id));
+
+// ─────────────────────────────────────────────
+// SVG ICON COMPONENTS
+// All icons are 14×14, stroke-based for consistency.
+// ─────────────────────────────────────────────
+
+const SZ = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
+const SZF = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor" }; // filled variant
+
+const Icon = {
+  /** Clipboard / copy */
+  Copy:    () => <svg {...SZ}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  /** Checkmark — used for Copied confirmation */
+  Check:   () => <svg {...SZ} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>,
+  /** Camera — screenshot */
+  Camera:  () => <svg {...SZ}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  /** File — PDF attachment */
+  File:    () => <svg {...SZ}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  /** X — close / clear */
+  X:       () => <svg {...SZ} strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  /** Square — stop streaming */
+  Stop:    () => <svg {...SZF}><rect x="4" y="4" width="16" height="16" rx="2"/></svg>,
+  /** Plus — add template */
+  Plus:    () => <svg {...SZ} strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  /** Star — custom template */
+  Star:    () => <svg {...SZ} strokeWidth="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  /** Warning triangle */
+  Warn:    () => <svg {...SZ} strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  /** Sparkles — explain */
+  Sparkle: () => <svg {...SZ} strokeWidth="1.8"><path d="M12 3L13.5 8.5L19 10L13.5 11.5L12 17L10.5 11.5L5 10L10.5 8.5Z"/></svg>,
+  /** Pencil — fix / grammar */
+  Pencil:  () => <svg {...SZ}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+  /** List — summarize */
+  List:    () => <svg {...SZ}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
+  /** Message bubble — chat */
+  Chat:    () => <svg {...SZ}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  /** Clock — timeline */
+  Clock:   () => <svg {...SZ}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  /** Brain / quiz (use grid) */
+  Grid:    () => <svg {...SZ}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+  /** Scale — critique */
+  Scale:   () => <svg {...SZ}><line x1="12" y1="3" x2="12" y2="20"/><path d="M3 6l9-3 9 3"/><path d="M3 6c0 3.314 2.686 6 6 6s6-2.686 6-6"/><path d="M15 6c0 3.314 2.686 6 6 6s6-2.686 6-6"/></svg>,
+  /** Book — reading mode */
+  Book:    () => <svg {...SZ}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
+};
+
+/** Maps a template icon key to the right Icon component. */
+const TemplateIcon = ({ icon }) => {
+  const map = {
+    explain: Icon.Sparkle, summarize: Icon.List, keypoints: Icon.List,
+    timeline: Icon.Clock,  quiz: Icon.Grid,     critique: Icon.Scale,
+    custom: Icon.Star,
+  };
+  const C = map[icon] || Icon.Star;
+  return <C />;
+};
+
+// ─────────────────────────────────────────────
+// ROOT COMPONENT
+// ─────────────────────────────────────────────
 
 const App = () => {
-  // --- STATE: NAVIGATION ---
-  const [activeTab, setActiveTab] = useState("chat");
+
+  // ── Navigation ───────────────────────────────
+  const [activeTab, setActiveTab]         = useState("chat");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm]       = useState("");
 
-  // --- STATE: CONTENT & INPUT ---
-  const [selectedText, setSelectedText] = useState(NO_CONTEXT_TEXT);
-  const [userInput, setUserInput] = useState("");
-  const [response, setResponse] = useState("No response yet.");
-  const [copyStatus, setCopyStatus] = useState("Copy");
+  // ── Chat content & input ─────────────────────
+  const [selectedText, setSelectedText]   = useState(NO_CONTEXT_TEXT);
+  const [userInput, setUserInput]         = useState("");
+  const [response, setResponse]           = useState("No response yet.");
+  const [copyStatus, setCopyStatus]       = useState("idle");
+  const [isStreaming, setIsStreaming]     = useState(false);
+  const [isEditMode, setIsEditMode]       = useState(false);
+  const [chatHistory, setChatHistory]     = useState([]);
+  const [contextStack, setContextStack]   = useState([]);
 
-  // --- STATE: CONFIGURATION ---
-  const [googleApiKey, setGoogleApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gemini-flash-latest");
+  // ── Multimodal attachments (Feature 4) ───────
+  const [screenshotData, setScreenshotData] = useState(null);  // base64 PNG string
+  const [attachedPdf, setAttachedPdf]       = useState(null);  // { name, base64, mimeType }
+  const pdfInputRef = useRef(null);
+
+  // ── Prompt templates (Feature 3) ─────────────
+  const [promptTemplates, setPromptTemplates] = useState(DEFAULT_TEMPLATES);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName]   = useState("");
+
+  // ── Configuration ────────────────────────────
+  const [googleApiKey, setGoogleApiKey]     = useState("");
   const [refineCustomPrompt, setRefineCustomPrompt] = useState("");
-  const [isFreePlan, setIsFreePlan] = useState(false);
+  const [isFreePlan, setIsFreePlan]         = useState(false);
   const [useAiSummaries, setUseAiSummaries] = useState(false);
-  const [autoCopy, setAutoCopy] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [contextStack, setContextStack] = useState([]);
+  const [autoCopy, setAutoCopy]             = useState(false);
+  const [isDarkMode, setIsDarkMode]         = useState(false);
   const [customCategories, setCustomCategories] = useState([
-    { name: "Dev", keywords: ["github", "stackoverflow", "docs."] },
+    { name: "Dev",    keywords: ["github", "stackoverflow", "docs."] },
     { name: "Social", keywords: ["twitter", "linkedin", "facebook"] },
-    { name: "News", keywords: ["news.", "cnn.", "bbc."] },
-    { name: "Media", keywords: ["youtube", "netflix"] },
+    { name: "News",   keywords: ["news.", "cnn.", "bbc."] },
+    { name: "Media",  keywords: ["youtube", "netflix"] },
     { name: "Search", keywords: ["google.com/search"] }
   ]);
 
-  // --- STATE: API & PERSISTENCE ---
-  const [models, setModels] = useState([]);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [savedPages, setSavedPages] = useState([]);
+  // ── API & persistence ────────────────────────
+  const [isSending, setIsSending]         = useState(false);
+  const [savedPages, setSavedPages]       = useState([]);
 
-  // --- SIDE EFFECTS: INITIALIZATION ---
+  // ── Toast ─────────────────────────────────────
+  const [toast, setToast] = useState(null); // { message, type }
+
+  // ── Refs ──────────────────────────────────────
+  const streamReaderRef = useRef(null);
+
+  // ─────────────────────────────────────────────
+  // HELPERS
+  // ─────────────────────────────────────────────
+
+  /**
+   * Shows a brief toast notification and auto-dismisses it.
+   * @param {string} message
+   * @param {"success"|"error"} type
+   */
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  // ─────────────────────────────────────────────
+  // INITIALIZATION
+  // ─────────────────────────────────────────────
+
   useEffect(() => {
-    // 1. Sync settings from chrome.storage.sync
+    // Load all persisted settings
     chrome.storage.sync.get(
-      ["selectedText", "googleApiKey", "refineCustomPrompt", "selectedModel", "response", "userInput", "isFreePlan", "useAiSummaries", "autoCopy", "isDarkMode", "customCategories", "contextStack"],
+      ["selectedText", "googleApiKey", "refineCustomPrompt",
+       "response", "userInput", "isFreePlan", "useAiSummaries", "autoCopy",
+       "isDarkMode", "customCategories", "contextStack", "promptTemplates"],
       (data) => {
         const maxChars = data.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
-        if (data.selectedText) setSelectedText(data.selectedText.substring(0, maxChars));
-        if (data.googleApiKey) setGoogleApiKey(data.googleApiKey);
-        if (data.selectedModel) setSelectedModel(data.selectedModel);
-        if (data.refineCustomPrompt) setRefineCustomPrompt(data.refineCustomPrompt);
-        if (data.response) setResponse(data.response);
-        if (data.userInput) setUserInput(data.userInput);
+        if (data.selectedText)        setSelectedText(data.selectedText.substring(0, maxChars));
+        if (data.googleApiKey)        setGoogleApiKey(data.googleApiKey);
+        if (data.refineCustomPrompt)  setRefineCustomPrompt(data.refineCustomPrompt);
+        if (data.response)            setResponse(data.response);
+        if (data.userInput)           setUserInput(data.userInput);
         if (data.isFreePlan !== undefined) setIsFreePlan(data.isFreePlan);
         setUseAiSummaries(data.useAiSummaries ?? false);
-        if (data.autoCopy !== undefined) setAutoCopy(data.autoCopy);
+        if (data.autoCopy !== undefined)   setAutoCopy(data.autoCopy);
         if (data.isDarkMode !== undefined) setIsDarkMode(data.isDarkMode);
-        if (data.customCategories) setCustomCategories(data.customCategories);
-        if (data.contextStack) setContextStack(data.contextStack);
-        if (data.googleApiKey) fetchModels(data.googleApiKey, data.selectedModel);
+        if (data.customCategories)    setCustomCategories(data.customCategories);
+        if (data.contextStack)        setContextStack(data.contextStack);
+        if (data.promptTemplates)     setPromptTemplates(data.promptTemplates);
       }
     );
 
-    // 2. Load saved pages from local storage
-    chrome.storage.local.get({ savedPages: [] }, (data) => setSavedPages(data.savedPages));
+    // Load local-only data
+    chrome.storage.local.get({ savedPages: [], chatHistory: [] }, (data) => {
+      setSavedPages(data.savedPages);
+      if (data.chatHistory?.length) setChatHistory(data.chatHistory);
+    });
 
-    // 3. Setup dynamic listener for storage changes
+    // Reactive storage listener
     const storageListener = (changes) => {
-      if (changes.savedPages) setSavedPages(changes.savedPages.newValue);
-
+      if (changes.savedPages)       setSavedPages(changes.savedPages.newValue);
       if (changes.selectedText) {
-        chrome.storage.sync.get(["isFreePlan"], (data) => {
-          const maxChars = data.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
-          setSelectedText(changes.selectedText.newValue.substring(0, maxChars));
+        chrome.storage.sync.get(["isFreePlan"], (d) => {
+          const max = d.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
+          setSelectedText(changes.selectedText.newValue.substring(0, max));
         });
       }
-
-      if (changes.isFreePlan) setIsFreePlan(changes.isFreePlan.newValue);
-      if (changes.useAiSummaries) setUseAiSummaries(changes.useAiSummaries.newValue);
-      if (changes.autoCopy) setAutoCopy(changes.autoCopy.newValue);
-      if (changes.isDarkMode) setIsDarkMode(changes.isDarkMode.newValue);
+      if (changes.isFreePlan)       setIsFreePlan(changes.isFreePlan.newValue);
+      if (changes.useAiSummaries)   setUseAiSummaries(changes.useAiSummaries.newValue);
+      if (changes.autoCopy)         setAutoCopy(changes.autoCopy.newValue);
+      if (changes.isDarkMode)       setIsDarkMode(changes.isDarkMode.newValue);
       if (changes.customCategories) setCustomCategories(changes.customCategories.newValue);
-      if (changes.contextStack) setContextStack(changes.contextStack.newValue);
+      if (changes.contextStack)     setContextStack(changes.contextStack.newValue);
+      if (changes.promptTemplates)  setPromptTemplates(changes.promptTemplates.newValue);
     };
 
     chrome.storage.onChanged.addListener(storageListener);
     return () => chrome.storage.onChanged.removeListener(storageListener);
   }, []);
 
+  // ─────────────────────────────────────────────
+  // MULTIMODAL HELPERS (Feature 4)
+  // ─────────────────────────────────────────────
+
   /**
-   * Fetches compatible Gemini models from the API.
+   * Requests a screenshot of the current tab from the background script.
    */
-  const fetchModels = async (apiKey, currentSelected) => {
-    if (!apiKey) return;
-    setIsLoadingModels(true);
-
+  const captureScreenshot = async () => {
     try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      if (!resp.ok) throw new Error("API call failed");
-
-      const data = await resp.json();
-      const filtered = data.models.filter(m => {
-        const id = m.name.toLowerCase();
-        return (
-          id.includes("gemini") &&
-          (id.includes("flash") || id.includes("pro")) &&
-          !id.includes("preview") &&
-          !id.includes("001") &&
-          !id.includes("002") &&
-          m.supportedGenerationMethods.includes("generateContent")
-        );
-      });
-      setModels(filtered);
-
+      const res = await chrome.runtime.sendMessage({ action: "captureTab" });
+      if (res?.dataUrl) {
+        setScreenshotData(res.dataUrl.split(",")[1]);
+        showToast("Screenshot captured!");
+      } else {
+        throw new Error(res?.error || "Unknown error");
+      }
     } catch (err) {
-      console.error("Failed to fetch models:", err);
-    } finally {
-      setIsLoadingModels(false);
+      showToast("Could not capture screenshot.", "error");
+      console.error(err);
     }
   };
 
   /**
-   * Constructs the prompt and sends it to the Gemini API.
+   * Reads an attached PDF file as base64.
+   */
+  const handlePdfAttach = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target.result.split(",")[1];
+      setAttachedPdf({ name: file.name, base64, mimeType: file.type || "application/pdf" });
+      showToast(`${file.name} attached!`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /** Clears all multimodal attachments. */
+  const clearAttachments = () => {
+    setScreenshotData(null);
+    setAttachedPdf(null);
+    if (pdfInputRef.current) pdfInputRef.current.value = "";
+  };
+
+  /** Cancels an active stream. */
+  const handleStop = () => {
+    streamReaderRef.current?.cancel();
+    streamReaderRef.current = null;
+    setIsStreaming(false);
+    setIsSending(false);
+  };
+
+  // ─────────────────────────────────────────────
+  // API — SEND (Streaming + Multi-turn, Feature 1)
+  // ─────────────────────────────────────────────
+
+  /**
+   * Sends the current message to Gemini using SSE streaming.
+   * Builds a multi-turn conversation from chatHistory.
    */
   const handleSend = async () => {
-    if ((!selectedText || selectedText === NO_CONTEXT_TEXT) && !userInput) return;
-    if (isSending || !googleApiKey) return;
+    const hasContent = userInput.trim() || screenshotData || attachedPdf ||
+      (selectedText && selectedText !== NO_CONTEXT_TEXT);
+    if (!hasContent || isSending || !googleApiKey) return;
 
     setIsSending(true);
+    setIsStreaming(true);
+    setResponse("");
 
     try {
-      // 1. Get current tab information
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tabs || tabs.length === 0) {
-        setResponse("Error: Could not find active tab.");
-        return;
-      }
+      if (!tabs?.length) { setResponse("**Error:** Could not find active tab."); return; }
       const tab = tabs[0];
-      const currentSelectedText = selectedText === NO_CONTEXT_TEXT ? "" : selectedText;
 
-      // Combine current context with the stacked multi-page collection
-      const fullContext = [...contextStack, currentSelectedText].filter(t => t.trim().length > 0).join("\n---\n");
+      const currentText = selectedText === NO_CONTEXT_TEXT ? "" : selectedText;
+      const fullContext = [...contextStack, currentText].filter(t => t.trim()).join("\n---\n");
 
-      // 2. Prepare the payload
-      const freeTierNote = isFreePlan ? " (Important: Be extremely concise to save tokens)" : "";
-      const prompt = `Act as Geminify by Hulmify. Efficiently summarize/answer using the provided context.${freeTierNote}
-        Supported actions: [SEARCH: "query"], [GOTO: "url"], [SCROLL: "up/down" or "down every 2s"], [CLICK: "selector"], [TYPE: "selector|text"], [NOTIFY: "message"].
-        
-        URL: ${tab.url}
-        Page: ${tab.title}
-        Context: ${fullContext || "No context provided."}
-        User: ${userInput || "Please summarize neatly."}`;
+      // System instruction with page context
+      const freeTierNote = isFreePlan ? " Be extremely concise." : "";
+      const systemText = `Act as Geminify by Hulmify. Efficiently summarize/answer using the provided context.${freeTierNote}
+Supported actions: [SEARCH: "query"], [GOTO: "url"], [SCROLL: "up/down"], [CLICK: "selector"], [TYPE: "selector|text"], [NOTIFY: "message"].
+URL: ${tab.url}
+Page: ${tab.title}
+Context: ${fullContext || "No context provided."}`;
 
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+      // Build multi-turn history
+      const historyTurns = chatHistory.map(msg => ({
+        role: msg.role === "user" ? "user" : "model",
+        parts: [{ text: msg.text }]
+      }));
 
-      // 3. Perform the API call
+      // New user message — supports multimodal parts
+      const userParts = [{ text: userInput.trim() || "Please summarize neatly." }];
+      if (screenshotData) userParts.push({ inlineData: { mimeType: "image/png",            data: screenshotData } });
+      if (attachedPdf)    userParts.push({ inlineData: { mimeType: attachedPdf.mimeType,   data: attachedPdf.base64 } });
+
+      const contents = [...historyTurns, { role: "user", parts: userParts }];
+
+      // We are standardizing on the latest Gemini Flash
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse`;
+
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "x-goog-api-key": googleApiKey,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        headers: { "x-goog-api-key": googleApiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemText }] },
+          contents
+        }),
       });
 
       if (!res.ok) {
@@ -174,109 +318,149 @@ const App = () => {
         throw new Error(errData?.error?.message || `API error: ${res.status}`);
       }
 
-      // 4. Handle response and built-in actions (e.g., [SEARCH: "..."])
-      const data = await res.json();
-      let responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+      // Stream tokens
+      const reader = res.body.getReader();
+      streamReaderRef.current = reader;
+      const decoder = new TextDecoder();
+      let accumulated = "";
 
-      const match = responseText.match(/\[([A-Z]+): "(.*?)"\]/);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr || jsonStr === "[DONE]") continue;
+          try {
+            const json = JSON.parse(jsonStr);
+            const token = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            accumulated += token;
+            setResponse(accumulated);
+          } catch { /* partial chunk — continue */ }
+        }
+      }
+      streamReaderRef.current = null;
+
+      // Detect and execute any built-in action commands after streaming completes
+      const match = accumulated.match(/\[([A-Z]+): "(.*?)"\]/);
       if (match) {
-        const action = match[1], val = match[2];
+        const [, action, val] = match;
         switch (action) {
-          case "SEARCH": chrome.tabs.create({ url: `https://www.google.com/search?q=${encodeURIComponent(val)}` }); responseText = `Searching: ${val}`; break;
-          case "GOTO": chrome.tabs.update(tab.id, { url: val }); responseText = `Opening ${val}`; break;
-          case "SCROLL": case "CLICK": case "TYPE": chrome.tabs.sendMessage(tab.id, { action: "performAction", type: action, value: val }); responseText = `Performing ${action.toLowerCase()} action...`; break;
+          case "SEARCH": chrome.tabs.create({ url: `https://www.google.com/search?q=${encodeURIComponent(val)}` }); break;
+          case "GOTO":   chrome.tabs.update(tab.id, { url: val }); break;
+          case "SCROLL":
+          case "CLICK":
+          case "TYPE":   chrome.tabs.sendMessage(tab.id, { action: "performAction", type: action, value: val }); break;
           case "NOTIFY": chrome.notifications.create({ type: "basic", iconUrl: "/icons/icon128.png", title: "Geminify", message: val }); break;
         }
       }
 
-      const resText = responseText;
-      setResponse(resText);
-      setCopyStatus("Copy");
-      chrome.storage.sync.set({ response: resText });
+      chrome.storage.sync.set({ response: accumulated });
 
-      // Add to Session History (keep last 20)
+      // Update conversation history (keep last 20 messages = 10 turns)
       const newHistory = [
         ...chatHistory,
-        { role: "user", text: userInput, timestamp: Date.now() },
-        { role: "assistant", text: resText, timestamp: Date.now() }
+        { role: "user",      text: userInput.trim() || "Please summarize neatly.", timestamp: Date.now() },
+        { role: "assistant", text: accumulated, timestamp: Date.now() }
       ].slice(-20);
       setChatHistory(newHistory);
       chrome.storage.local.set({ chatHistory: newHistory });
 
-      // Support Auto-Copy
+      // Auto-copy
       if (autoCopy) {
-        navigator.clipboard.writeText(resText);
+        navigator.clipboard.writeText(accumulated);
         setCopyStatus("Auto-Copied!");
         setTimeout(() => setCopyStatus("Copy"), 2000);
       }
 
+      clearAttachments();
+      setCopyStatus("Copy");
+
     } catch (err) {
-      setResponse(`**Error:** ${err.message}`);
-      console.error("Geminify error:", err);
+      if (err.name !== "AbortError") {
+        setResponse(`**Error:** ${err.message}`);
+        console.error("Geminify send error:", err);
+      }
     } finally {
+      setIsStreaming(false);
       setIsSending(false);
+      streamReaderRef.current = null;
     }
   };
 
-  /**
-   * Removes a saved page from local storage.
-   */
-  const handleDeletePage = (timestamp) => {
-    const updated = savedPages.filter(p => p.timestamp !== timestamp);
-    chrome.storage.local.set({ savedPages: updated });
+  // ─────────────────────────────────────────────
+  // PROMPT TEMPLATES (Feature 3)
+  // ─────────────────────────────────────────────
+
+  /** Saves the current userInput as a new named template. */
+  const handleSaveTemplate = () => {
+    if (!newTemplateName.trim() || !userInput.trim()) return;
+    const newTpl = { id: `custom-${Date.now()}`, label: newTemplateName.trim(), icon: "custom", prompt: userInput };
+    const updated = [...promptTemplates, newTpl];
+    setPromptTemplates(updated);
+    chrome.storage.sync.set({ promptTemplates: updated });
+    setShowSaveTemplate(false);
+    setNewTemplateName("");
+    showToast("Template saved!");
   };
 
-  /**
-   * Updates the category of an existing saved page.
-   */
-  const handleUpdateCategory = (timestamp, newCategory) => {
-    const updated = savedPages.map(page =>
-      page.timestamp === timestamp ? { ...page, category: newCategory } : page
-    );
-    // Persist changes to local storage
-    chrome.storage.local.set({ savedPages: updated });
+  /** Deletes a user-created template (default templates cannot be deleted). */
+  const handleDeleteTemplate = (id) => {
+    const updated = promptTemplates.filter(t => t.id !== id);
+    setPromptTemplates(updated);
+    chrome.storage.sync.set({ promptTemplates: updated });
+    showToast("Template deleted.");
   };
+
+  // ─────────────────────────────────────────────
+  // LIBRARY
+  // ─────────────────────────────────────────────
+
+  const handleDeletePage = (timestamp) => {
+    chrome.storage.local.set({ savedPages: savedPages.filter(p => p.timestamp !== timestamp) });
+  };
+
+  const handleUpdateCategory = (timestamp, newCategory) => {
+    chrome.storage.local.set({
+      savedPages: savedPages.map(p => p.timestamp === timestamp ? { ...p, category: newCategory } : p)
+    });
+  };
+
+  // ─────────────────────────────────────────────
+  // CONTEXT
+  // ─────────────────────────────────────────────
 
   /**
    * Scrapes the current page for text and form inputs to use as context.
    */
   const selectAll = async () => {
-    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    await chrome.scripting.executeScript({
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.scripting.executeScript({
       target: { tabId: tab.id },
       function: () => {
         const documentText = document.body.innerText;
         let allValues = "";
-
-        // Extract basic form values for better multi-step context
-        document.querySelectorAll("input, textarea, select").forEach((element) => {
-          if (["password", "email", "hidden", "file"].includes(element.type)) return;
-          let name = element.name || "";
-          let value = element.value || "";
-
+        document.querySelectorAll("input, textarea, select").forEach((el) => {
+          if (["password", "email", "hidden", "file"].includes(el.type)) return;
+          let name = el.name || "";
+          let value = el.value || "";
           if (!name) {
-            let parentLoopIndex = 0, parentElement = element;
-            while (parentLoopIndex < 10) {
-              parentElement = parentElement?.parentElement;
-              if (!parentElement) break;
-              const labelElement = parentElement.querySelector("label");
-              if (labelElement) { name = labelElement.innerText; break; }
-              parentLoopIndex++;
+            let i = 0, parent = el;
+            while (i++ < 10) {
+              parent = parent?.parentElement;
+              if (!parent) break;
+              const lbl = parent.querySelector("label");
+              if (lbl) { name = lbl.innerText; break; }
             }
           }
-
-          if (element.tagName === "SELECT") {
-            value = element.options[element.selectedIndex]?.innerText || "";
-          }
-          allValues += `Name: ${name || element.id || "Unknown"}, Value: ${value || "Empty"}\n`;
+          if (el.tagName === "SELECT") value = el.options[el.selectedIndex]?.innerText || "";
+          allValues += `Name: ${name || el.id || "Unknown"}, Value: ${value || "Empty"}\n`;
         });
-
         return `${documentText}${allValues ? "\n\n===== Form Values =====\n\n" + allValues : ""}`;
       },
     }, (results) => {
-      const text = results && results[0] ? (results[0].result || "") : "";
-
+      const text = results?.[0]?.result || "";
       if (text) {
         const maxChars = isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
         setSelectedText(text.substring(0, maxChars));
@@ -285,46 +469,33 @@ const App = () => {
     });
   };
 
-  /**
-   * Adds the current page context to the multi-page context stack.
-   */
   const handleAddToStack = () => {
     if (selectedText === NO_CONTEXT_TEXT) return;
-    const newStack = [...contextStack, selectedText].slice(-5); // Keep last 5 pages
+    const newStack = [...contextStack, selectedText].slice(-5);
     setContextStack(newStack);
     chrome.storage.sync.set({ contextStack: newStack });
     setSelectedText(NO_CONTEXT_TEXT);
     chrome.storage.sync.set({ selectedText: NO_CONTEXT_TEXT });
   };
 
-  /**
-   * Clears context, user input, AI response, and full chat history.
-   */
   const handleClearAll = () => {
-    // 1. Reset all React state
     setSelectedText(NO_CONTEXT_TEXT);
     setUserInput("");
     setResponse("No response yet.");
     setChatHistory([]);
     setContextStack([]);
-
-    // 2. Persist to storage
-    chrome.storage.sync.set({
-      selectedText: NO_CONTEXT_TEXT,
-      userInput: "",
-      response: "No response yet.",
-      contextStack: []
-    });
+    clearAttachments();
+    chrome.storage.sync.set({ selectedText: NO_CONTEXT_TEXT, userInput: "", response: "No response yet.", contextStack: [] });
     chrome.storage.local.set({ chatHistory: [] });
   };
 
-  /**
-   * Exports the library of saved pages to a JSON file.
-   */
+  // ─────────────────────────────────────────────
+  // DATA MANAGEMENT
+  // ─────────────────────────────────────────────
+
   const handleExport = () => {
-    const data = JSON.stringify(savedPages, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    const blob = new Blob([JSON.stringify(savedPages, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = `geminify_library_${new Date().toISOString().split("T")[0]}.json`;
@@ -332,105 +503,228 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * Imports a library of saved pages from a JSON file.
-   */
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = (ev) => {
       try {
-        const data = JSON.parse(event.target.result);
+        const data = JSON.parse(ev.target.result);
         if (Array.isArray(data)) {
           chrome.storage.local.set({ savedPages: data }, () => {
             setSavedPages(data);
-            alert("Library imported successfully!");
+            showToast("Library imported successfully!");
           });
         }
-      } catch (err) {
-        alert("Invalid file format. Please upload a valid Geminify JSON export.");
-      }
+      } catch { showToast("Invalid file format.", "error"); }
     };
     reader.readAsText(file);
   };
 
-  // --- RENDER ---
+  // ─────────────────────────────────────────────
+  // COMPUTED
+  // ─────────────────────────────────────────────
+
+  const filteredPages = useMemo(() =>
+    savedPages.filter(p => {
+      const matchCat  = activeCategory === "All" || p.category === activeCategory;
+      const matchText = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        p.summary.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchCat && matchText;
+    }),
+    [savedPages, activeCategory, searchTerm]
+  );
+
+  const hasAttachment = !!(screenshotData || attachedPdf);
+
+  // ─────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────
+
   return (
     <div className={`app-container ${isDarkMode ? "dark-theme" : ""}`}>
 
-      {/* HEADER SECTION */}
+      {/* ── TOAST ── */}
+      {toast && (
+        <div className={`toast ${toast.type === "error" ? "toast--error" : "toast--success"}`}>
+          <span className="toast-icon">
+            {toast.type === "error" ? <Icon.Warn /> : <Icon.Check />}
+          </span>
+          {toast.message}
+        </div>
+      )}
+
+      {/* ── HEADER ── */}
       <header>
         <div className="header-top">
           <div className="logo-text">GEMINI<span>FY</span></div>
-          <span style={{
-            width: "8px",
-            height: "8px",
-            borderRadius: "50%",
-            background: googleApiKey ? "#10b981" : "#f43f5e"
-          }}></span>
+          <span className={`status-dot ${googleApiKey ? "status-dot--online" : "status-dot--offline"}`} />
         </div>
-
         <div className="tabs-nav">
-          <button className={`tab-btn ${activeTab === "chat" ? "active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
-          <button className={`tab-btn ${activeTab === "pages" ? "active" : ""}`} onClick={() => setActiveTab("pages")}>My Pages</button>
+          <button className={`tab-btn ${activeTab === "chat"     ? "active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
+          <button className={`tab-btn ${activeTab === "pages"    ? "active" : ""}`} onClick={() => setActiveTab("pages")}>My Pages</button>
           <button className={`tab-btn ${activeTab === "settings" ? "active" : ""}`} onClick={() => setActiveTab("settings")}>Settings</button>
         </div>
       </header>
 
-      {/* TAB: CHAT INTERFACE */}
+      {/* ══════════════════════════════════════
+          TAB: CHAT
+      ══════════════════════════════════════ */}
       {activeTab === "chat" && (
         <div className="section">
 
+          {/* Page Context */}
           <div className="card">
             <div className="label-row">
               <label>Page Context</label>
               <div style={{ display: "flex", gap: "10px" }}>
-                <a href="#" className="small-link" onClick={selectAll} title="Automatically extract text and form data from the current page">Read Page</a>
-                <a href="#" className="small-link" onClick={handleAddToStack} title="Store current page text into a multi-page context collection">Add to Collection</a>
+                <a href="#" className="small-link" onClick={selectAll}        title="Extract text from current page">Read Page</a>
+                <a href="#" className="small-link" onClick={handleAddToStack} title="Add to multi-page collection">+ Collect</a>
                 <a href="#" className="small-link" style={{ color: "#f43f5e" }} onClick={handleClearAll}>Clear All</a>
               </div>
             </div>
             <div className="context-box">{selectedText}</div>
             {contextStack.length > 0 && (
-              <div style={{ fontSize: "0.65rem", color: "#4896bf", marginTop: "4px", fontWeight: "600" }}>
+              <div style={{ fontSize: "0.65rem", color: "#4896bf", fontWeight: "600" }}>
                 &bull; {contextStack.length} other page(s) in collection
               </div>
             )}
           </div>
 
+          {/* Ask Gemini */}
           <div className="card">
             <label>Ask Gemini</label>
+
+            {/* ── Prompt Templates (Feature 3) ── */}
+            <div className="template-row">
+              {promptTemplates.map(t => (
+                <button
+                  key={t.id}
+                  className="template-pill"
+                  title={t.prompt}
+                  onClick={() => {
+                    setUserInput(t.prompt);
+                    chrome.storage.sync.set({ userInput: t.prompt });
+                  }}
+                >
+                  <TemplateIcon icon={t.icon} />
+                  {t.label}
+                </button>
+              ))}
+              {userInput.trim() && (
+                <button
+                  className="template-pill template-pill--add"
+                  title="Save as template"
+                  onClick={() => setShowSaveTemplate(s => !s)}
+                >
+                  ＋ Save
+                </button>
+              )}
+            </div>
+
+            {/* Save-template inline form */}
+            {showSaveTemplate && (
+              <div className="template-save-row">
+                <input
+                  type="text"
+                  placeholder="Template name..."
+                  value={newTemplateName}
+                  onChange={e => setNewTemplateName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSaveTemplate()}
+                  style={{ flex: 1, padding: "8px 12px", fontSize: "0.82rem" }}
+                />
+                <button className="btn-primary" style={{ width: "auto", padding: "8px 14px", fontSize: "0.82rem" }} onClick={handleSaveTemplate}>Save</button>
+                <button className="btn-primary" style={{ background: "#f1f5f9", color: "#64748b", boxShadow: "none", width: "auto", padding: "8px 14px", fontSize: "0.82rem" }} onClick={() => setShowSaveTemplate(false)}>
+                  <Icon.X />
+                </button>
+              </div>
+            )}
+
+            {/* Textarea */}
             <textarea
-              placeholder="Ask about this page..."
+              placeholder="Ask about this page… or use a template above"
               value={userInput}
-              onChange={(e) => { setUserInput(e.target.value); chrome.storage.sync.set({ userInput: e.target.value }); }}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              onChange={e => { setUserInput(e.target.value); chrome.storage.sync.set({ userInput: e.target.value }); }}
+              onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
             />
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button className="btn-primary" style={{ flex: 1 }} disabled={isSending || !googleApiKey} onClick={handleSend}>
-                {isSending ? "Thinking..." : "Send"}
+
+            {/* ── Multimodal Attachment Bar (Feature 4) ── */}
+            <div className="attachment-bar">
+              <button
+                className={`attach-btn ${screenshotData ? "attach-btn--active" : ""}`}
+                onClick={screenshotData ? clearAttachments : captureScreenshot}
+                title="Capture screenshot of current page"
+              >
+                <Icon.Camera />
+                {screenshotData ? "Screenshot" : "Screenshot"}
+                {screenshotData && <Icon.Check />}
               </button>
-              <button className="btn-primary" style={{ background: "#f1f5f9", color: "#64748b", boxShadow: "none", width: "auto", padding: "14px 20px" }} onClick={handleClearAll}>
+
+              <button
+                className={`attach-btn ${attachedPdf ? "attach-btn--active" : ""}`}
+                onClick={() => attachedPdf ? clearAttachments() : pdfInputRef.current?.click()}
+                title="Attach a PDF for analysis"
+              >
+                <Icon.File />
+                {attachedPdf ? `${attachedPdf.name.substring(0, 12)}…` : "PDF"}
+                {attachedPdf && <Icon.Check />}
+              </button>
+              <input ref={pdfInputRef} type="file" hidden accept=".pdf,application/pdf" onChange={handlePdfAttach} />
+
+              {hasAttachment && (
+                <button className="attach-btn attach-btn--clear" onClick={clearAttachments}>
+                  <Icon.X /> Clear
+                </button>
+              )}
+            </div>
+
+            {/* Send / Stop */}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                className="btn-primary"
+                style={{ flex: 1 }}
+                disabled={!isStreaming && (isSending || !googleApiKey)}
+                onClick={isStreaming ? handleStop : handleSend}
+              >
+                {isStreaming
+                  ? <><Icon.Stop /> Stop</>
+                  : isSending ? "Thinking…" : "Send"
+                }
+              </button>
+              <button
+                className="btn-primary"
+                style={{ background: "#f1f5f9", color: "#64748b", boxShadow: "none", width: "auto", padding: "14px 20px" }}
+                onClick={handleClearAll}
+              >
                 Clear
               </button>
             </div>
           </div>
 
+          {/* ── AI Response (Feature 1 — streams live) ── */}
           {response && response !== "No response yet." && (
             <div className="response-card">
               <div className="response-header">
-                <label>AI Response</label>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <a href="#" className="small-link" onClick={() => setIsEditMode(!isEditMode)}>
+                <label>
+                  AI Response
+                  {isStreaming && <span className="streaming-cursor" aria-label="Streaming" />}
+                </label>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <a href="#" className="small-link" onClick={() => setIsEditMode(m => !m)}>
                     {isEditMode ? "View" : "Code"}
                   </a>
-                  <a href="#" className="small-link" onClick={() => {
-                    navigator.clipboard.writeText(response);
-                    setCopyStatus("Copied!");
-                    setTimeout(() => setCopyStatus("Copy"), 2000);
-                  }}>{copyStatus}</a>
+                  <button
+                    className="copy-btn"
+                    onClick={() => {
+                      navigator.clipboard.writeText(response);
+                      setCopyStatus("copied");
+                      setTimeout(() => setCopyStatus("idle"), 2000);
+                    }}
+                    title="Copy response"
+                  >
+                    {copyStatus === "copied" ? <Icon.Check /> : <Icon.Copy />}
+                    {copyStatus === "copied" ? "Copied" : "Copy"}
+                  </button>
                 </div>
               </div>
               {isEditMode ? (
@@ -446,32 +740,34 @@ const App = () => {
             </div>
           )}
 
-          {/* CHAT SESSION HISTORY */}
+          {/* Chat history */}
           {chatHistory.length > 0 && (
             <div className="chat-history-container">
-              <label style={{ fontSize: "0.7rem", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", margin: "10px 0 5px 5px", display: "block" }}>Session History</label>
+              <label style={{ fontSize: "0.7rem", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", margin: "10px 0 5px 5px", display: "block" }}>
+                Session History
+              </label>
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`chat-bubble ${msg.role}`}>
                   <div className="bubble-text">{msg.text}</div>
-                  <div className="bubble-time">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div className="bubble-time">{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
               ))}
             </div>
           )}
-
         </div>
       )}
 
-      {/* TAB: SAVED PAGES */}
+      {/* ══════════════════════════════════════
+          TAB: MY PAGES
+      ══════════════════════════════════════ */}
       {activeTab === "pages" && (
         <div className="section">
-          {/* SEARCH & FILTERS */}
           <div className="search-container">
             <input
               type="text"
               placeholder="Search in library..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="search-input"
             />
           </div>
@@ -482,9 +778,7 @@ const App = () => {
                 key={cat}
                 className={`category-tag ${activeCategory === cat ? "active" : ""}`}
                 onClick={() => setActiveCategory(cat)}
-              >
-                {cat}
-              </button>
+              >{cat}</button>
             ))}
           </div>
 
@@ -493,182 +787,88 @@ const App = () => {
             <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: "600" }}>{savedPages.length}/40</span>
           </div>
 
-          {savedPages.filter(p => {
-            const matchesCat = activeCategory === "All" || p.category === activeCategory;
-            const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              p.summary.toLowerCase().includes(searchTerm.toLowerCase());
-            return matchesCat && matchesSearch;
-          }).length > 0 ?
-            savedPages
-              .filter(p => {
-                const matchesCat = activeCategory === "All" || p.category === activeCategory;
-                const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  p.summary.toLowerCase().includes(searchTerm.toLowerCase());
-                return matchesCat && matchesSearch;
-              })
-              .map(page => (
-                <div className="card" key={page.timestamp} style={{ gap: "8px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2px", maxWidth: "80%" }}>
-                      <select
-                        className="badge-category-select"
-                        value={page.category || "Insight"}
-                        onChange={(e) => handleUpdateCategory(page.timestamp, e.target.value)}
-                      >
-                        {["Insight", "Dev", "News", "Social", "Media", "Search"].map(cat => (
-                          <option key={cat} value={cat}>{cat.toUpperCase()}</option>
-                        ))}
-                      </select>
-                      <a href={page.url} target="_blank" className="small-link" style={{ fontSize: "0.9rem", color: "#1e293b" }}>
-                        {page.title}
-                      </a>
-                    </div>
-                    <a href="#" className="small-link" style={{ color: "#f43f5e" }} onClick={() => handleDeletePage(page.timestamp)}>
-                      Delete
-                    </a>
-                  </div>
-                  <div
-                    className="context-box"
-                    style={{ background: "white", border: "none", fontStyle: "normal", padding: "0" }}
-                    dangerouslySetInnerHTML={{ __html: marked.parse(page.summary) }}
-                  />
+          {filteredPages.length > 0 ? filteredPages.map(page => (
+            <div className="card" key={page.timestamp} style={{ gap: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px", maxWidth: "80%" }}>
+                  <select
+                    className="badge-category-select"
+                    value={page.category || "Insight"}
+                    onChange={e => handleUpdateCategory(page.timestamp, e.target.value)}
+                  >
+                    {["Insight", "Dev", "News", "Social", "Media", "Search"].map(cat => (
+                      <option key={cat} value={cat}>{cat.toUpperCase()}</option>
+                    ))}
+                  </select>
+                  <a href={page.url} target="_blank" className="small-link" style={{ fontSize: "0.9rem", color: "#1e293b" }}>
+                    {page.title}
+                  </a>
                 </div>
-              )) : (
-              <div className="card" style={{ textAlign: "center", fontStyle: "italic", padding: "40px" }}>
-                No pages found {activeCategory !== "All" ? `in ${activeCategory}` : "yet"}.
+                <a href="#" className="small-link" style={{ color: "#f43f5e" }} onClick={() => handleDeletePage(page.timestamp)}>Delete</a>
               </div>
-            )}
-
+              <div
+                className="context-box"
+                style={{ background: "white", border: "none", fontStyle: "normal", padding: "0" }}
+                dangerouslySetInnerHTML={{ __html: marked.parse(page.summary) }}
+              />
+            </div>
+          )) : (
+            <div className="card" style={{ textAlign: "center", fontStyle: "italic", padding: "40px" }}>
+              No pages found {activeCategory !== "All" ? `in ${activeCategory}` : "yet"}.
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB: SETTINGS & CONFIG */}
+      {/* ══════════════════════════════════════
+          TAB: SETTINGS
+      ══════════════════════════════════════ */}
       {activeTab === "settings" && (
         <div className="section">
 
           <div className="card">
             <label>API Setup</label>
-            <input type="text" placeholder="Gemini API Key" value={googleApiKey} onChange={(e) => setGoogleApiKey(e.target.value)} />
+            <input type="text" placeholder="Gemini API Key" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} />
             <button className="btn-primary" onClick={() => {
               chrome.storage.sync.set({ googleApiKey }, () => {
-                alert("Saved!");
-                fetchModels(googleApiKey);
+                showToast("API key saved!");
               });
             }}>Save Key</button>
           </div>
 
-          <div className="card">
-            <label>Model Configuration</label>
-            <select value={selectedModel} onChange={(e) => {
-              setSelectedModel(e.target.value);
-              chrome.storage.sync.set({ selectedModel: e.target.value });
-            }}>
-              {isLoadingModels ? (
-                <option>Loading...</option>
-              ) : models.length > 0 ? (
-                models.map(m => (<option key={m.name} value={m.name.split("/").pop()}>{m.displayName || m.name}</option>))
-              ) : (
-                <option value="gemini-flash-latest">Gemini Flash Latest</option>
-              )}
-            </select>
-          </div>
-
-          <div className="card">
-            <div className="label-row">
-              <label>Free Tier Optimization</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "0.7rem", color: isFreePlan ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
-                  {isFreePlan ? "ON" : "OFF"}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={isFreePlan}
-                  onChange={(e) => {
-                    setIsFreePlan(e.target.checked);
-                    chrome.storage.sync.set({ isFreePlan: e.target.checked });
-                  }}
-                  style={{ width: "auto", cursor: "pointer" }}
-                />
+          {/* Toggle settings */}
+          {[
+            { label: "Free Tier Optimization",  key: "isFreePlan",     value: isFreePlan,     setter: setIsFreePlan,    desc: "Reduces context size and forces short responses." },
+            { label: "Save Locally (No AI)",     key: "useAiSummaries", value: !useAiSummaries, setter: v => { setUseAiSummaries(!v); chrome.storage.sync.set({ useAiSummaries: !v }); return; }, invertedKey: true, desc: "Save pages without using Gemini tokens." },
+            { label: "Auto-Copy to Clipboard",   key: "autoCopy",       value: autoCopy,       setter: setAutoCopy },
+            { label: "Dark Mode",                key: "isDarkMode",     value: isDarkMode,     setter: setIsDarkMode },
+          ].map(({ label, key, value, setter, invertedKey, desc }) => (
+            <div className="card" key={key}>
+              <div className="label-row">
+                <label>{label}</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "0.7rem", color: value ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>{value ? "ON" : "OFF"}</span>
+                  <input
+                    type="checkbox"
+                    checked={value}
+                    onChange={e => {
+                      if (invertedKey) { setter(e.target.checked); }
+                      else { setter(e.target.checked); chrome.storage.sync.set({ [key]: e.target.checked }); }
+                    }}
+                    style={{ width: "auto", cursor: "pointer" }}
+                  />
+                </div>
               </div>
+              {desc && <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0 }}>{desc}</p>}
             </div>
-            <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0 }}>
-              Reduces context size and forces short responses to prevent API limit failures.
-            </p>
-          </div>
-
-          <div className="card">
-            <div className="label-row">
-              <label>Save locally</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "0.7rem", color: !useAiSummaries ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
-                  {!useAiSummaries ? "ON" : "OFF"}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!useAiSummaries}
-                  onChange={(e) => {
-                    setUseAiSummaries(!e.target.checked);
-                    chrome.storage.sync.set({ useAiSummaries: !e.target.checked });
-                  }}
-                  style={{ width: "auto", cursor: "pointer" }}
-                />
-              </div>
-            </div>
-            <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0, marginBottom: "10px" }}>
-              Instantly summarize and save pages without using Gemini tokens.
-            </p>
-          </div>
-
-          <div className="card">
-            <div className="label-row">
-              <label>Auto-Copy to Clipboard</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "0.7rem", color: autoCopy ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
-                  {autoCopy ? "ON" : "OFF"}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={autoCopy}
-                  onChange={(e) => {
-                    setAutoCopy(e.target.checked);
-                    chrome.storage.sync.set({ autoCopy: e.target.checked });
-                  }}
-                  style={{ width: "auto", cursor: "pointer" }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="label-row">
-              <label>Dark Mode</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "0.7rem", color: isDarkMode ? "#10b981" : "#94a3b8", fontWeight: "bold" }}>
-                  {isDarkMode ? "ON" : "OFF"}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={isDarkMode}
-                  onChange={(e) => {
-                    setIsDarkMode(e.target.checked);
-                    chrome.storage.sync.set({ isDarkMode: e.target.checked });
-                  }}
-                  style={{ width: "auto", cursor: "pointer" }}
-                />
-              </div>
-            </div>
-          </div>
+          ))}
 
           <div className="card">
             <div className="label-row">
               <label>Data Management</label>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button className="btn-primary" style={{ background: "#f1f5f9", color: "#1e293b", width: "auto", padding: "8px 16px", fontSize: "0.8rem" }} onClick={handleExport}>
-                  Export
-                </button>
-                <button className="btn-primary" style={{ background: "#f1f5f9", color: "#1e293b", width: "auto", padding: "8px 16px", fontSize: "0.8rem" }} onClick={() => document.getElementById('import-file').click()}>
-                  Import
-                </button>
+                <button className="btn-primary" style={{ background: "#f1f5f9", color: "#1e293b", width: "auto", padding: "8px 16px", fontSize: "0.8rem" }} onClick={handleExport}>Export</button>
+                <button className="btn-primary" style={{ background: "#f1f5f9", color: "#1e293b", width: "auto", padding: "8px 16px", fontSize: "0.8rem" }} onClick={() => document.getElementById("import-file").click()}>Import</button>
                 <input id="import-file" type="file" hidden accept=".json" onChange={handleImport} />
               </div>
             </div>
@@ -677,14 +877,43 @@ const App = () => {
           <div className="card">
             <label>Default Refine Rules</label>
             <textarea
-              placeholder="e.g. 'Fix grammar and style...'"
+              placeholder="e.g. 'Fix grammar and improve style...'"
               value={refineCustomPrompt}
-              onChange={(e) => setRefineCustomPrompt(e.target.value)}
+              onChange={e => setRefineCustomPrompt(e.target.value)}
               style={{ minHeight: "60px" }}
             />
-            <button className="btn-primary" onClick={() => {
-              chrome.storage.sync.set({ refineCustomPrompt }, () => alert("Saved!"));
-            }}>Update Rules</button>
+            <button className="btn-primary" onClick={() => chrome.storage.sync.set({ refineCustomPrompt }, () => showToast("Rules saved!"))}>
+              Update Rules
+            </button>
+          </div>
+
+          {/* Prompt Templates manager */}
+          <div className="card">
+            <label>Prompt Templates</label>
+            <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "0 0 8px" }}>
+              Click a template in the Chat tab to pre-fill your question. Custom templates can be deleted.
+            </p>
+            {promptTemplates.map(t => (
+              <div key={t.id} className="template-manager-row">
+                <span style={{ fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "6px" }}><TemplateIcon icon={t.icon} /><strong>{t.label}</strong></span>
+                {!DEFAULT_TEMPLATE_IDS.has(t.id) && (
+                  <a href="#" className="small-link" style={{ color: "#f43f5e", fontSize: "0.75rem" }} onClick={() => handleDeleteTemplate(t.id)}>
+                    Delete
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Reading Mode hint */}
+          <div className="card" style={{ background: "linear-gradient(135deg, #eff6ff, #f0f9ff)", border: "1px solid #bae6fd" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon.Book />
+              <label style={{ color: "#0369a1" }}>Reading Mode</label>
+            </div>
+            <p style={{ fontSize: "0.8rem", color: "#0369a1", margin: 0 }}>
+              Activate Reading Mode — an AI-generated summary sidebar with paragraph-level Q&A — via right-click → Geminify Actions.
+            </p>
           </div>
 
         </div>

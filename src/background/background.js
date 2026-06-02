@@ -1,8 +1,9 @@
 /**
  * background.js
  * Geminify by Hulmify
- * 
- * Handles context menu creation and interaction events for the extension.
+ *
+ * Handles context menu creation, interaction events, tab capture,
+ * and keyboard command routing for the extension.
  */
 
 /**
@@ -10,7 +11,7 @@
  */
 function createMenus() {
   chrome.contextMenus.removeAll(() => {
-    
+
     // Create the primary parent menu for all Geminify actions
     chrome.contextMenus.create({
       id: "geminifyParent",
@@ -26,11 +27,11 @@ function createMenus() {
       contexts: ["selection"],
     });
 
-    // Sub-menu for text refinement tasks (Grammar, Professionaling, etc.)
+    // Sub-menu for text refinement tasks (Grammar, Professional, etc.)
     chrome.contextMenus.create({
       id: "refineSub",
       parentId: "geminifyParent",
-      title: "Refine & Correct",
+      title: "Refine and Correct",
       contexts: ["editable"],
     });
 
@@ -61,6 +62,14 @@ function createMenus() {
       contexts: ["page"],
     });
 
+    // Action to toggle Reading Mode on the current page
+    chrome.contextMenus.create({
+      id: "readingMode",
+      parentId: "geminifyParent",
+      title: "Reading Mode",
+      contexts: ["page"],
+    });
+
   });
 }
 
@@ -75,7 +84,7 @@ chrome.runtime.onInstalled.addListener(() => {
  * Global listener for context menu interactions.
  */
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  
+
   if (info.menuItemId === "sendText") {
     // Save selected text to storage and open the popup
     chrome.storage.sync.set({ selectedText: info.selectionText }, () => {
@@ -86,6 +95,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     // Notify the content script to perform auto-summarization
     chrome.tabs.sendMessage(tab.id, { action: "autoSummarize" });
 
+  } else if (info.menuItemId === "readingMode") {
+    // Activate Reading Mode via the content script
+    chrome.tabs.sendMessage(tab.id, { action: "activateReadingMode" });
+
   } else if (info.menuItemId.startsWith("refine-")) {
     const tone = info.menuItemId.replace("refine-", "");
     chrome.tabs.sendMessage(tab.id, {
@@ -93,5 +106,26 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       tone: tone,
       text: info.selectionText
     });
+  }
+});
+
+/**
+ * Captures the visible tab as a base64-encoded PNG data URL.
+ * Used by the popup for screenshot-based multimodal queries.
+ */
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "captureTab") {
+    chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse({ dataUrl });
+      }
+    });
+    return true; // Keep message channel open for async response
+  }
+  
+  if (message.action === "openPopup") {
+    chrome.action.openPopup();
   }
 });
