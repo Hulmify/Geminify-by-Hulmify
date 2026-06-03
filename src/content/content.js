@@ -316,7 +316,44 @@ function addStyles() {
  * @returns {Promise<string>} The response text.
  */
 const callAI = async (prompt, apiKey, opts = {}) => {
-  const provider = opts.aiProvider || "gemini";
+  const provider = opts.aiProvider || "windowai";
+
+  if (provider === "windowai") {
+    let availableStatus = "unavailable";
+    const aiOptions = { 
+      expectedInputs: [{ type: "text", languages: ["en"] }, { type: "image" }],
+      expectedOutputs: [{ type: "text", languages: ["en"] }] 
+    };
+    
+    if (window.ai && window.ai.languageModel) {
+      const capabilities = await window.ai.languageModel.capabilities(aiOptions);
+      availableStatus = capabilities.available;
+    } else if (window.LanguageModel) {
+      availableStatus = await window.LanguageModel.availability(aiOptions);
+    } else {
+      throw new Error("Chrome Built-in AI is not available. Please enable it in Settings.");
+    }
+    
+    if (availableStatus === "no" || availableStatus === "unavailable") {
+      throw new Error("Chrome Built-in AI is disabled or unsupported. Please check Settings.");
+    }
+    
+    try {
+      const aiOptions = {
+        expectedInputs: [{ type: "text", languages: ["en"] }, { type: "image" }],
+        expectedOutputs: [{ type: "text", languages: ["en"] }]
+      };
+      const session = (window.ai && window.ai.languageModel) ? 
+        await window.ai.languageModel.create(aiOptions) : 
+        await window.LanguageModel.create(aiOptions);
+        
+      const result = await session.prompt(prompt);
+      session.destroy();
+      return result || "No response.";
+    } catch (err) {
+      throw new Error(`Chrome AI Error: ${err.message}`);
+    }
+  }
 
   if (provider === "openrouter") {
     const orKey = opts.openrouterApiKey || "";
@@ -505,7 +542,7 @@ function handleToolbarAction(text, tone) {
   addBox(anchor, "Thinking...", { title: "Geminify" });
 
   chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
-    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.aiProvider === "windowai" ? "local" : data.googleApiKey;
     if (!activeKey) {
       addBox(anchor, "No API key set. Open Geminify settings to add your key.");
       return;
@@ -659,7 +696,7 @@ async function activateReadingMode() {
     const summaryEl = document.getElementById("geminify-reading-summary");
     if (!summaryEl) return;
 
-    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.aiProvider === "windowai" ? "local" : data.googleApiKey;
     if (!activeKey) {
       summaryEl.innerHTML = `<p style="color:#94a3b8;font-size:0.8rem;">Set your API key in Geminify settings to generate AI summaries.</p>`;
       return;
@@ -703,7 +740,7 @@ function handleParagraphClick(para) {
   addBox(para, "Analysing paragraph...", { title: "Paragraph Insight" });
 
   chrome.storage.sync.get(["googleApiKey", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
-    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.aiProvider === "windowai" ? "local" : data.googleApiKey;
     if (!activeKey) {
       addBox(para, "No API key set.");
       return;
@@ -754,7 +791,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     addBox(element, "Thinking...");
 
     chrome.storage.sync.get(["googleApiKey", "refineCustomPrompt", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
-      const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+      const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.aiProvider === "windowai" ? "local" : data.googleApiKey;
       if (!activeKey) {
         addBox(element, "API Key missing. Set it in Geminify Settings.");
         return;
@@ -801,7 +838,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.googleApiKey;
+      const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.aiProvider === "windowai" ? "local" : data.googleApiKey;
       if (!activeKey) {
         floatingStatus.innerText = "Set API Key first";
         setTimeout(() => floatingStatus.remove(), 3000);

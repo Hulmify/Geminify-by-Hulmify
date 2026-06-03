@@ -128,4 +128,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "openPopup") {
     chrome.action.openPopup();
   }
+  
+  if (message.action === "triggerLocalAIDownload") {
+    const aiOptions = { 
+      expectedInputs: [{ type: "text", languages: ["en"] }, { type: "image" }],
+      expectedOutputs: [{ type: "text", languages: ["en"] }] 
+    };
+    const createOpts = {
+      ...aiOptions,
+      monitor(m) {
+        m.addEventListener("downloadprogress", (e) => {
+          chrome.runtime.sendMessage({ 
+            action: "downloadProgress", 
+            data: { loaded: e.loaded, total: e.total } 
+          }).catch(() => {});
+        });
+      }
+    };
+    
+    (async () => {
+      try {
+        let dummySession;
+        if (self.ai && self.ai.languageModel) {
+          dummySession = await self.ai.languageModel.create(createOpts);
+        } else if (self.LanguageModel) {
+          dummySession = await self.LanguageModel.create(createOpts);
+        }
+        chrome.runtime.sendMessage({ action: "downloadComplete" }).catch(() => {});
+        if (dummySession) dummySession.destroy();
+      } catch (err) {
+        chrome.runtime.sendMessage({ action: "downloadError" }).catch(() => {});
+      }
+    })();
+    sendResponse({ status: "started" });
+  }
 });

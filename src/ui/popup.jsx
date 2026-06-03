@@ -112,10 +112,12 @@ const App = () => {
   // ── Configuration ────────────────────────────
   const [googleApiKey, setGoogleApiKey]         = useState("");
   const [openrouterApiKey, setOpenrouterApiKey] = useState("");
-  const [aiProvider, setAiProvider]             = useState("gemini"); // "gemini" | "openrouter"
+  const [aiProvider, setAiProvider]             = useState("windowai"); // "gemini" | "openrouter" | "windowai"
   const [openrouterModel, setOpenrouterModel]   = useState("");
   const [openrouterModels, setOpenrouterModels] = useState([]);   // fetched multimodal models
   const [modelsLoading, setModelsLoading]       = useState(false);
+  const [windowAiStatus, setWindowAiStatus]     = useState("checking"); // "ready" | "downloading" | "unavailable" | "checking"
+  const [downloadProgress, setDownloadProgress] = useState("");
   const [refineCustomPrompt, setRefineCustomPrompt] = useState("");
   const [isFreePlan, setIsFreePlan]         = useState(false);
   const [useAiSummaries, setUseAiSummaries] = useState(false);
@@ -216,6 +218,45 @@ const App = () => {
 
   // Fetch multimodal models from OpenRouter whenever the provider is switched to openrouter
   useEffect(() => {
+    if (aiProvider === "windowai") {
+      const checkWindowAi = async () => {
+        setWindowAiStatus("checking");
+        try {
+          let availableStatus = "unavailable";
+          
+          const aiOptions = { 
+            expectedInputs: [{ type: "text", languages: ["en"] }, { type: "image" }],
+            expectedOutputs: [{ type: "text", languages: ["en"] }] 
+          };
+          
+          if (window.ai && window.ai.languageModel) {
+            const capabilities = await window.ai.languageModel.capabilities(aiOptions);
+            availableStatus = capabilities.available;
+          } else if (window.LanguageModel) {
+            // New proposed standard: window.LanguageModel
+            availableStatus = await window.LanguageModel.availability(aiOptions);
+          } else {
+            setWindowAiStatus("unavailable");
+            return;
+          }
+
+          if (availableStatus === "no" || availableStatus === "unavailable") {
+            setWindowAiStatus("unavailable");
+          } else if (availableStatus === "after-download" || availableStatus === "downloading" || availableStatus === "downloadable") {
+            setWindowAiStatus("downloading");
+            setDownloadProgress({ text: "Starting download...", percent: 0 });
+            chrome.runtime.sendMessage({ action: "triggerLocalAIDownload" });
+          } else {
+            setWindowAiStatus("ready");
+          }
+        } catch (e) {
+          setWindowAiStatus("unavailable");
+        }
+      };
+      checkWindowAi();
+      return;
+    }
+
     if (aiProvider !== "openrouter" || openrouterModels.length > 0) return;
     setModelsLoading(true);
     fetch("https://openrouter.ai/api/v1/models")
@@ -285,7 +326,8 @@ const App = () => {
 
   /** Cancels an active stream. */
   const handleStop = () => {
-    streamReaderRef.current?.cancel();
+    if (streamReaderRef.current?.cancel) streamReaderRef.current.cancel();
+    if (streamReaderRef.current?.destroy) streamReaderRef.current.destroy();
     streamReaderRef.current = null;
     setIsStreaming(false);
     setIsSending(false);
@@ -302,9 +344,10 @@ const App = () => {
   const handleSend = async () => {
     const hasContent = userInput.trim() || screenshotData || attachedPdf ||
       (selectedText && selectedText !== NO_CONTEXT_TEXT);
-    const activeKey = aiProvider === "openrouter" ? openrouterApiKey.trim() : googleApiKey.trim();
-    if (!hasContent || isSending || !activeKey || (aiProvider === "openrouter" && !openrouterModel)) {
-      if (!activeKey) showToast(aiProvider === "openrouter" ? "Enter & save your OpenRouter API key in Settings." : "Enter & save your Gemini API key in Settings.", "error");
+    const activeKey = aiProvider === "openrouter" ? openrouterApiKey.trim() : (aiProvider === "windowai" ? "local" : googleApiKey.trim());
+    if (!hasContent || isSending || !activeKey || (aiProvider === "openrouter" && !openrouterModel) || (aiProvider === "windowai" && windowAiStatus === "unavailable")) {
+      if (aiProvider === "windowai" && windowAiStatus === "unavailable") showToast("Built-in AI is unavailable. Please check settings.", "error");
+      else if (!activeKey && aiProvider !== "windowai") showToast(aiProvider === "openrouter" ? "Enter & save your OpenRouter API key in Settings." : "Enter & save your Gemini API key in Settings.", "error");
       else if (aiProvider === "openrouter" && !openrouterModel) showToast("Please select a model in Settings.", "error");
       return;
     }
@@ -344,7 +387,91 @@ Context: ${fullContext || "No context provided."}`;
 
       let res;
 
-      if (aiProvider === "openrouter") {
+      if (aiProvider === "windowai") {
+        try {
+          let session;
+          const aiOptions = {
+            systemPrompt: systemText,
+            expectedInputs: [{ type: "text", languages: ["en"] }, { type: "image" }],
+            expectedOutputs: [{ type: "text", languages: ["en"] }]
+          };
+          if (window.ai && window.ai.languageModel) {
+            session = await window.ai.languageModel.create(aiOptions);
+          } else if (window.LanguageModel) {
+            session = await window.LanguageModel.create(aiOptions);
+          } else {
+            throw new Error("Local AI is not available in this browser version.");
+          }
+          const userText = userInput.trim() || "Please summarize neatly.";
+          let promptContent = [{ type: "text", value: userText }];
+          
+          if (screenshotData) {
+            const byteCharacters = atob(screenshotData);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const blob = new Blob([new Uint8Array(byteNumbers)], { type: "image/png" });
+            promptContent.push({ type: "image", value: blob });
+          }
+          
+          if (attachedPdf) {
+            promptContent[0].value += `\n\n[PDF attached: ${attachedPdf.name} — local AI currently cannot read it natively]`;
+          }
+          
+          const promptPayload = [
+            {
+              role: "user",
+              content: promptContent
+            }
+          ];
+          
+          const stream = await session.promptStreaming(promptPayload);
+          
+          streamReaderRef.current = session;
+          
+          let accumulated = "";
+          for await (const chunk of stream) {
+            if (!streamReaderRef.current) {
+              // The user clicked stop and streamReaderRef.current was nulled
+              break;
+            }
+            if (chunk.startsWith(accumulated)) {
+              accumulated = chunk; // cumulative
+            } else {
+              accumulated += chunk; // delta
+            }
+            setResponse(accumulated);
+          }
+          
+          if (streamReaderRef.current) {
+            session.destroy();
+            streamReaderRef.current = null;
+          }
+          
+          chrome.storage.sync.set({ response: accumulated });
+          const newHistory = [
+            ...chatHistory,
+            { role: "user", text: userInput.trim() || "Please summarize neatly.", timestamp: Date.now() },
+            { role: "assistant", text: accumulated, timestamp: Date.now() }
+          ].slice(-20);
+          setChatHistory(newHistory);
+          chrome.storage.local.set({ chatHistory: newHistory });
+
+          if (autoCopy) {
+            navigator.clipboard.writeText(accumulated);
+            setCopyStatus("Auto-Copied!");
+            setTimeout(() => setCopyStatus("Copy"), 2000);
+          }
+          clearAttachments();
+          setCopyStatus("Copy");
+          setIsStreaming(false);
+          setIsSending(false);
+          return; // Exit handleSend early for window.ai since we handled stream completely
+        } catch (err) {
+          throw new Error(`Chrome AI Error: ${err.message}`);
+        }
+      } else if (aiProvider === "openrouter") {
         // ── OpenRouter (OpenAI-compatible streaming) ──────────────────────
         // Some providers (incl. Google via OpenRouter) reject a standalone
         // system message, so we prepend the system prompt to the first user
@@ -520,6 +647,35 @@ Context: ${fullContext || "No context provided."}`;
   // CONTEXT
   // ─────────────────────────────────────────────
 
+  // ── Global Listener for background downloads ──
+  useEffect(() => {
+    const listener = (msg) => {
+      if (msg.action === "downloadProgress") {
+        const e = msg.data;
+        if (e.total) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          if (e.total <= 100) {
+            setDownloadProgress({ text: `${pct}%`, percent: pct });
+          } else {
+            const loadedMB = (e.loaded / (1024 * 1024)).toFixed(1);
+            const totalMB = (e.total / (1024 * 1024)).toFixed(1);
+            setDownloadProgress({ text: `${pct}% (${loadedMB}MB / ${totalMB}MB)`, percent: pct });
+          }
+        } else {
+          const loadedMB = (e.loaded / (1024 * 1024)).toFixed(1);
+          setDownloadProgress({ text: `${loadedMB}MB downloaded`, percent: null });
+        }
+      } else if (msg.action === "downloadComplete") {
+        setWindowAiStatus("ready");
+        setDownloadProgress("");
+      } else if (msg.action === "downloadError") {
+        setWindowAiStatus("unavailable");
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, []);
+
   /**
    * Scrapes the current page for text and form inputs to use as context.
    */
@@ -626,6 +782,7 @@ Context: ${fullContext || "No context provided."}`;
 
   const hasAttachment = !!(screenshotData || attachedPdf);
   const supportsPdf = aiProvider === "gemini" || (aiProvider === "openrouter" && openrouterModels.find(m => m.id === openrouterModel)?.supportsFile);
+  const supportsImage = true;
   
   // Clear PDF attachment if model doesn't support it
   useEffect(() => {
@@ -633,6 +790,13 @@ Context: ${fullContext || "No context provided."}`;
       setAttachedPdf(null);
     }
   }, [supportsPdf, attachedPdf]);
+
+  // Clear screenshot attachment if model doesn't support it
+  useEffect(() => {
+    if (!supportsImage && screenshotData) {
+      setScreenshotData(null);
+    }
+  }, [supportsImage, screenshotData]);
 
   // ─────────────────────────────────────────────
   // RENDER
@@ -655,7 +819,7 @@ Context: ${fullContext || "No context provided."}`;
       <header>
         <div className="header-top">
           <div className="logo-text">GEMINI<span>FY</span></div>
-          <span className={`status-dot ${(aiProvider === "openrouter" ? openrouterApiKey : googleApiKey) ? "status-dot--online" : "status-dot--offline"}`} />
+          <span className={`status-dot ${(aiProvider === "openrouter" ? openrouterApiKey : aiProvider === "windowai" ? windowAiStatus === "ready" : googleApiKey) ? "status-dot--online" : "status-dot--offline"}`} />
         </div>
         <div className="tabs-nav">
           <button className={`tab-btn ${activeTab === "chat"     ? "active" : ""}`} onClick={() => setActiveTab("chat")}>Chat</button>
@@ -747,15 +911,17 @@ Context: ${fullContext || "No context provided."}`;
 
             {/* ── Multimodal Attachment Bar (Feature 4) ── */}
             <div className="attachment-bar">
-              <button
-                className={`attach-btn ${screenshotData ? "attach-btn--active" : ""}`}
-                onClick={screenshotData ? clearAttachments : captureScreenshot}
-                title="Capture screenshot of current page"
-              >
-                <Icon.Camera />
-                {screenshotData ? "Screenshot" : "Screenshot"}
-                {screenshotData && <Icon.Check />}
-              </button>
+              {supportsImage && (
+                <button
+                  className={`attach-btn ${screenshotData ? "attach-btn--active" : ""}`}
+                  onClick={screenshotData ? clearAttachments : captureScreenshot}
+                  title="Capture screenshot of current page"
+                >
+                  <Icon.Camera />
+                  {screenshotData ? "Screenshot" : "Screenshot"}
+                  {screenshotData && <Icon.Check />}
+                </button>
+              )}
 
               {supportsPdf && (
                 <>
@@ -784,7 +950,7 @@ Context: ${fullContext || "No context provided."}`;
               <button
                 className="btn-primary"
                 style={{ flex: 1 }}
-                disabled={!isStreaming && (isSending || !(aiProvider === "openrouter" ? openrouterApiKey : googleApiKey))}
+                disabled={!isStreaming && (isSending || (aiProvider === "openrouter" ? !openrouterApiKey : aiProvider === "windowai" ? windowAiStatus === "unavailable" : !googleApiKey))}
                 onClick={isStreaming ? handleStop : handleSend}
               >
                 {isStreaming
@@ -934,10 +1100,10 @@ Context: ${fullContext || "No context provided."}`;
           <div className="card">
             <label>AI Provider</label>
             <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "0 0 8px" }}>
-              Both providers use the latest Gemini Flash model. OpenRouter routes via its API gateway.
+              All providers utilize Gemini models. OpenRouter routes via its API gateway, while Built-in AI runs locally on your device.
             </p>
             <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-              {[{ id: "gemini", label: "Google Gemini" }, { id: "openrouter", label: "OpenRouter" }].map(p => (
+              {[{ id: "windowai", label: "Built-in AI" }, { id: "gemini", label: "Google Gemini" }, { id: "openrouter", label: "OpenRouter" }].map(p => (
                 <button
                   key={p.id}
                   className="btn-primary"
@@ -971,7 +1137,7 @@ Context: ${fullContext || "No context provided."}`;
                   chrome.storage.sync.set({ googleApiKey }, () => showToast("Gemini API key saved!"));
                 }}>Save Gemini Key</button>
               </>
-            ) : (
+            ) : aiProvider === "openrouter" ? (
               <>
                 <input
                   type="text"
@@ -986,7 +1152,7 @@ Context: ${fullContext || "No context provided."}`;
                 {/* Multimodal model selector */}
                 <div style={{ marginTop: "10px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <label style={{ fontSize: "0.75rem", color: "#475569", fontWeight: "600" }}>Multimodal Model</label>
+                    <label style={{ fontSize: "0.75rem", color: "#475569", fontWeight: "600" }}>Model</label>
                     {modelsLoading && <span style={{ fontSize: "0.68rem", color: "#a855f7" }}>Fetching…</span>}
                     {!modelsLoading && openrouterModels.length > 0 && (
                       <span style={{ fontSize: "0.68rem", color: "#94a3b8" }}>{openrouterModels.length} models</span>
@@ -1027,7 +1193,48 @@ Context: ${fullContext || "No context provided."}`;
                   )}
                 </div>
               </>
-            )}
+            ) : aiProvider === "windowai" ? (
+              <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                {windowAiStatus === "ready" && (
+                  <p style={{ color: "#16a34a", fontSize: "0.85rem", margin: 0, fontWeight: "500" }}>✓ Chrome Built-in AI is ready to use!</p>
+                )}
+                {windowAiStatus === "downloading" && (
+                  <div style={{ padding: "8px 0" }}>
+                    <p style={{ color: "#f59e0b", fontSize: "0.85rem", margin: "0 0 8px 0", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span className="spinner" style={{ width: "12px", height: "12px", borderWidth: "2px", borderTopColor: "#f59e0b" }}></span>
+                      Model is downloading in the background. Please wait...
+                    </p>
+                    {downloadProgress && (
+                      <div style={{ background: "#e2e8f0", borderRadius: "10px", height: "8px", width: "100%", overflow: "hidden", position: "relative" }}>
+                        <div style={{ 
+                          width: `${downloadProgress.percent || 0}%`, 
+                          height: "100%", 
+                          background: "linear-gradient(90deg, #f59e0b, #fbbf24)",
+                          transition: "width 0.3s ease"
+                        }}></div>
+                      </div>
+                    )}
+                    {downloadProgress && (
+                      <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "6px 0 0 0", textAlign: "right" }}>
+                        Progress: {downloadProgress.text}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {windowAiStatus === "unavailable" && (
+                  <div style={{ fontSize: "0.82rem", color: "#475569", lineHeight: "1.5" }}>
+                    <p style={{ color: "#dc2626", fontWeight: "600", marginTop: 0, marginBottom: "8px" }}>Built-in AI is not enabled.</p>
+                    <p style={{ margin: "0 0 6px" }}>To enable it (requires Chrome 131+ or Canary):</p>
+                    <ol style={{ paddingLeft: "20px", margin: 0 }}>
+                      <li>Go to <code>chrome://flags/#prompt-api-for-gemini-nano</code> and set to <b>Enabled</b></li>
+                      <li>Go to <code>chrome://flags/#optimization-guide-on-device-model</code> and set to <b>Enabled BypassPerfRequirement</b></li>
+                      <li>Restart Chrome.</li>
+                      <li>Go to <code>chrome://components</code> and check for updates on <b>Optimization Guide On Device Model</b>.</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Toggle settings */}
@@ -1114,7 +1321,7 @@ Context: ${fullContext || "No context provided."}`;
       )}
 
       <footer>
-        Geminify by Hulmify &bull; Powered by {aiProvider === "openrouter" ? "OpenRouter + Gemini Flash" : "Google Gemini"} &copy; 2026
+        Geminify by Hulmify &bull; Powered by {aiProvider === "openrouter" ? "OpenRouter" : aiProvider === "windowai" ? "Chrome Built-in AI" : "Google Gemini"} &copy; 2026
       </footer>
     </div>
   );
