@@ -320,6 +320,7 @@ const callAI = async (prompt, apiKey, opts = {}) => {
 
   if (provider === "openrouter") {
     const orKey = opts.openrouterApiKey || "";
+      
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -329,7 +330,7 @@ const callAI = async (prompt, apiKey, opts = {}) => {
         "X-Title": "Geminify by Hulmify",
       },
       body: JSON.stringify({
-        model: opts.openrouterModel || "google/gemini-2.5-flash-preview",
+        model: opts.openrouterModel,
         messages: [{ role: "user", content: prompt }],
         stream: false,
       }),

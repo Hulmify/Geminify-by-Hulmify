@@ -113,7 +113,7 @@ const App = () => {
   const [googleApiKey, setGoogleApiKey]         = useState("");
   const [openrouterApiKey, setOpenrouterApiKey] = useState("");
   const [aiProvider, setAiProvider]             = useState("gemini"); // "gemini" | "openrouter"
-  const [openrouterModel, setOpenrouterModel]   = useState("google/gemini-2.5-flash-preview");
+  const [openrouterModel, setOpenrouterModel]   = useState("");
   const [openrouterModels, setOpenrouterModels] = useState([]);   // fetched multimodal models
   const [modelsLoading, setModelsLoading]       = useState(false);
   const [refineCustomPrompt, setRefineCustomPrompt] = useState("");
@@ -234,11 +234,6 @@ const App = () => {
             supportsFile: m.architecture?.input_modalities?.includes("file") || false
           }));
         setOpenrouterModels(multimodal);
-        // Auto-select the first model if current selection isn't in the list
-        if (multimodal.length && !multimodal.find(m => m.id === openrouterModel)) {
-          setOpenrouterModel(multimodal[0].id);
-          chrome.storage.sync.set({ openrouterModel: multimodal[0].id });
-        }
       })
       .catch(() => showToast("Could not load OpenRouter models.", "error"))
       .finally(() => setModelsLoading(false));
@@ -308,8 +303,9 @@ const App = () => {
     const hasContent = userInput.trim() || screenshotData || attachedPdf ||
       (selectedText && selectedText !== NO_CONTEXT_TEXT);
     const activeKey = aiProvider === "openrouter" ? openrouterApiKey.trim() : googleApiKey.trim();
-    if (!hasContent || isSending || !activeKey) {
+    if (!hasContent || isSending || !activeKey || (aiProvider === "openrouter" && !openrouterModel)) {
       if (!activeKey) showToast(aiProvider === "openrouter" ? "Enter & save your OpenRouter API key in Settings." : "Enter & save your Gemini API key in Settings.", "error");
+      else if (aiProvider === "openrouter" && !openrouterModel) showToast("Please select a model in Settings.", "error");
       return;
     }
 
@@ -853,7 +849,11 @@ Context: ${fullContext || "No context provided."}`;
               </label>
               {chatHistory.map((msg, i) => (
                 <div key={i} className={`chat-bubble ${msg.role}`}>
-                  <div className="bubble-text">{msg.text}</div>
+                  {msg.role === "assistant" ? (
+                    <div className="bubble-text" dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }} />
+                  ) : (
+                    <div className="bubble-text" style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
+                  )}
                   <div className="bubble-time">{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
               ))}
@@ -994,7 +994,7 @@ Context: ${fullContext || "No context provided."}`;
                   </div>
                   {openrouterModels.length > 0 ? (
                     <select
-                      value={openrouterModel}
+                      value={openrouterModel || ""}
                       onChange={e => {
                         setOpenrouterModel(e.target.value);
                         chrome.storage.sync.set({ openrouterModel: e.target.value });
@@ -1006,6 +1006,7 @@ Context: ${fullContext || "No context provided."}`;
                         fontFamily: "inherit",
                       }}
                     >
+                      <option value="" disabled>Select a model...</option>
                       {openrouterModels.map(m => (
                         <option key={m.id} value={m.id}>{m.label}</option>
                       ))}

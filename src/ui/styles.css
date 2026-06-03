@@ -307,11 +307,12 @@ textarea {
 }
 
 /* Markdown Support */
-.response-content h1, .response-content h2 { margin: 1.5rem 0 1rem; color: var(--text-primary); }
-.response-content p { margin-bottom: 1rem; }
-.response-content code { background: #f1f5f9; padding: 0.2em 0.4em; border-radius: 4px; font-family: monospace; font-size: 0.875em; }
-.response-content pre { background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1rem; }
-.response-content pre code { background: transparent; padding: 0; color: inherit; }
+.response-content h1, .response-content h2, .bubble-text h1, .bubble-text h2 { margin: 1.5rem 0 1rem; color: var(--text-primary); }
+.response-content p, .bubble-text p { margin-bottom: 1rem; }
+.response-content p:last-child, .bubble-text p:last-child { margin-bottom: 0; }
+.response-content code, .bubble-text code { background: #f1f5f9; padding: 0.2em 0.4em; border-radius: 4px; font-family: monospace; font-size: 0.875em; color: #0f172a; }
+.response-content pre, .bubble-text pre { background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1rem; }
+.response-content pre code, .bubble-text pre code { background: transparent; padding: 0; color: inherit; }
 
 /* Search & Content Filters */
 .search-container {
