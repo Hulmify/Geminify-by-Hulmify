@@ -927,7 +927,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     addStyles();
 
     const floatingStatus = document.createElement("div");
-    floatingStatus.style.cssText = "position:fixed;top:20px;right:20px;padding:10px 20px;background:#4896bf;color:white;border-radius:10px;z-index:2147483645;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.2);";
+    floatingStatus.style.cssText = `
+      position: fixed !important;
+      top: 20px !important;
+      right: 20px !important;
+      padding: 10px 20px !important;
+      background: #4896bf !important;
+      color: white !important;
+      border-radius: 10px !important;
+      z-index: 2147483645 !important;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+      font-size: 14px !important;
+      line-height: 1.4 !important;
+      font-weight: 600 !important;
+      text-transform: none !important;
+      letter-spacing: normal !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    `;
     floatingStatus.innerText = "Summarizing Page...";
     document.body.appendChild(floatingStatus);
 
