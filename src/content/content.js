@@ -16,19 +16,28 @@ function addBox(element, text, options = {}) {
 
   const SPACING = 16;
   const MAX_HEIGHT = 224;
-  const rect = element.getBoundingClientRect();
-  const topPosition = rect.top + element.clientHeight + SPACING;
-
   const box = document.createElement("div");
   box.id = "geminify-box";
   box.style.position = "fixed";
-  box.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 360)}px`;
-  box.style.width = `${Math.min(element.clientWidth, 480)}px`;
 
-  if (topPosition + MAX_HEIGHT < window.innerHeight) {
-    box.style.top = `${topPosition}px`;
-  } else {
+  const rect = element ? element.getBoundingClientRect() : null;
+  const isAnchorless = !element || element === document.body || element === document.documentElement || !rect || (rect.width === 0 && rect.height === 0);
+
+  if (isAnchorless) {
+    box.style.width = "400px";
     box.style.bottom = `${SPACING}px`;
+    box.style.left = "50%";
+    box.style.transform = "translateX(-50%)";
+  } else {
+    const topPosition = rect.top + element.clientHeight + SPACING;
+    box.style.left = `${Math.min(rect.left, window.innerWidth - 360)}px`;
+    box.style.width = `${Math.min(element.clientWidth, 480)}px`;
+
+    if (topPosition + MAX_HEIGHT < window.innerHeight) {
+      box.style.top = `${topPosition}px`;
+    } else {
+      box.style.bottom = `${SPACING}px`;
+    }
   }
   box.style.maxHeight = `${MAX_HEIGHT}px`;
 
@@ -63,6 +72,61 @@ function addBox(element, text, options = {}) {
     copyButton.innerHTML = `${checkSvg} Copied!`;
     setTimeout(() => { copyButton.innerHTML = `${copySvg} Copy`; }, 2000);
   });
+
+  // Draggable logic
+  let isDragging = false;
+  let startX, startY;
+  let startLeft, startTop;
+  let boxWidth, boxHeight;
+
+  const onMouseDown = (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest("button") || e.target.closest("a") || e.target.closest(".geminify-content")) return;
+
+    isDragging = true;
+    const curRect = box.getBoundingClientRect();
+    startLeft = curRect.left;
+    startTop = curRect.top;
+    boxWidth = curRect.width;
+    boxHeight = curRect.height;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    box.style.left = `${startLeft}px`;
+    box.style.top = `${startTop}px`;
+    box.style.bottom = "auto";
+    box.style.transform = "none";
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    e.preventDefault();
+  };
+
+  const onMouseMove = (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    let newLeft = startLeft + dx;
+    let newTop = startTop + dy;
+
+    const maxLeft = window.innerWidth - boxWidth;
+    const maxTop = window.innerHeight - boxHeight;
+
+    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    newTop = Math.max(0, Math.min(newTop, maxTop));
+
+    box.style.left = `${newLeft}px`;
+    box.style.top = `${newTop}px`;
+  };
+
+  const onMouseUp = () => {
+    isDragging = false;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+  };
+
+  box.addEventListener("mousedown", onMouseDown);
 
   document.body.appendChild(box);
   box.focus();
@@ -101,15 +165,88 @@ function addStyles() {
       gap: 8px;
       max-width: 480px;
       min-width: 320px;
+      cursor: grab;
+      user-select: none;
     }
-    #geminify-box h6 { color: #4896bf; margin: 0; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
-    .geminify-content { margin: 0 !important; color: #334155; max-height: 250px; overflow-y: auto; font-size: 0.9rem; }
-    .geminify-content p { margin-bottom: 8px !important; }
-    .geminify-footer { display: flex; justify-content: flex-end; margin-top: 4px; gap: 8px; }
-    #geminify-box button#geminify-copy-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 12px; color: #4896bf!important; background: transparent!important; border: 1px solid #e2e8f0!important; border-radius: 6px!important; cursor: pointer!important; font-size: 12px!important; font-weight: 600!important; font-family: inherit; transition: all 0.15s ease; }
-    #geminify-box button#geminify-copy-button:hover { background: #f0f9ff!important; border-color: #bae6fd!important; }
-    #geminify-box button#geminify-close-button { display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: #94a3b8; cursor: pointer; position: absolute; right: 10px; top: 10px; height: 28px; width: 28px; transition: all 0.2s ease; border-radius: 6px; }
-    #geminify-box button#geminify-close-button:hover { background: #f1f5f9; color: #475569; }
+    #geminify-box:active {
+      cursor: grabbing;
+    }
+    #geminify-box h6 {
+      color: #4896bf;
+      margin: 0;
+      font-size: 11px !important;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .geminify-content {
+      margin: 0 !important;
+      color: #334155;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 14px !important;
+      cursor: auto;
+      user-select: text;
+    }
+    .geminify-content * {
+      font-size: 14px !important;
+      line-height: 1.6 !important;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    }
+    .geminify-content p {
+      margin-bottom: 8px !important;
+    }
+    .geminify-content code {
+      font-family: monospace !important;
+      font-size: 13px !important;
+    }
+    .geminify-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+      gap: 8px;
+      cursor: auto;
+    }
+    #geminify-box button#geminify-copy-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 5px 12px;
+      color: #4896bf!important;
+      background: transparent!important;
+      border: 1px solid #e2e8f0!important;
+      border-radius: 6px!important;
+      cursor: pointer!important;
+      font-size: 12px!important;
+      font-weight: 600!important;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    #geminify-box button#geminify-copy-button:hover {
+      background: #f0f9ff!important;
+      border-color: #bae6fd!important;
+    }
+    #geminify-box button#geminify-close-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      height: 28px;
+      width: 28px;
+      transition: all 0.2s ease;
+      border-radius: 6px;
+    }
+    #geminify-box button#geminify-close-button:hover {
+      background: #f1f5f9;
+      color: #475569;
+    }
 
     /* ── Inline Toolbar ── */
     #geminify-toolbar {
@@ -175,6 +312,7 @@ function addStyles() {
       font-family: 'Inter', system-ui, sans-serif;
       animation: geminifySidebarIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
       overflow: hidden;
+      font-size: 14px !important;
     }
     @keyframes geminifySidebarIn {
       from { transform: translateX(100%); opacity: 0.5; }
@@ -191,7 +329,7 @@ function addStyles() {
     }
     #geminify-reading-header h5 {
       margin: 0;
-      font-size: 0.8rem;
+      font-size: 13px !important;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -222,7 +360,7 @@ function addStyles() {
     #geminify-reading-body::-webkit-scrollbar { width: 5px; }
     #geminify-reading-body::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     .geminify-reading-section-label {
-      font-size: 0.6rem;
+      font-size: 10px !important;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.1em;
@@ -230,24 +368,37 @@ function addStyles() {
       margin-bottom: 6px;
     }
     .geminify-reading-summary {
-      font-size: 0.875rem;
-      line-height: 1.7;
-      color: #334155;
+      font-size: 14px !important;
+      line-height: 1.7 !important;
+      color: #334155 !important;
     }
-    .geminify-reading-summary p { margin-bottom: 8px; }
-    .geminify-reading-summary ul { padding-left: 16px; }
-    .geminify-reading-summary li { margin-bottom: 4px; }
+    .geminify-reading-summary * {
+      font-size: 14px !important;
+      line-height: 1.7 !important;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    }
+    .geminify-reading-summary p { margin-bottom: 8px !important; }
+    .geminify-reading-summary ul { padding-left: 16px !important; }
+    .geminify-reading-summary li { margin-bottom: 4px !important; }
     .geminify-reading-summary h1,
     .geminify-reading-summary h2,
-    .geminify-reading-summary h3 { font-size: 0.9rem; margin: 10px 0 5px; color: #1e293b; }
+    .geminify-reading-summary h3 {
+      font-size: 15px !important;
+      margin: 10px 0 5px !important;
+      color: #1e293b !important;
+      font-weight: 700 !important;
+    }
     .geminify-reading-hint {
       background: #f0f9ff;
       border: 1px solid #bae6fd;
       border-radius: 10px;
       padding: 10px 14px;
-      font-size: 0.78rem;
-      color: #0369a1;
-      line-height: 1.5;
+      font-size: 13px !important;
+      color: #0369a1 !important;
+      line-height: 1.5 !important;
+    }
+    .geminify-reading-hint * {
+      font-size: 13px !important;
     }
     .geminify-reading-skeleton {
       display: flex;
@@ -268,24 +419,13 @@ function addStyles() {
     .geminify-reading-footer {
       padding: 12px 20px;
       border-top: 1px solid #f1f5f9;
-      font-size: 0.7rem;
+      font-size: 11px !important;
       color: #94a3b8;
       text-align: center;
       flex-shrink: 0;
     }
 
-    /* ── Page paragraph highlight in Reading Mode ── */
-    .geminify-para-highlight {
-      cursor: pointer;
-      transition: background 0.2s ease, border-radius 0.2s ease;
-      border-radius: 4px;
-      padding: 2px 4px;
-      margin: -2px -4px;
-    }
-    .geminify-para-highlight:hover {
-      background: rgba(72, 150, 191, 0.08) !important;
-      outline: 1px dashed rgba(72, 150, 191, 0.3);
-    }
+
 
     /* ── Automation capsule ── */
     @keyframes capsuleFadeIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
@@ -572,6 +712,9 @@ function handleToolbarAction(text, tone) {
 
 // Listen for mouseup to show the toolbar on text selection
 document.addEventListener("mouseup", (e) => {
+  // Only show the popup when reading mode is on
+  if (!readingModeActive) return;
+
   // Don't interfere with the Geminify toolbar/box itself
   if (e.target.closest("#geminify-toolbar") || e.target.closest("#geminify-box")) return;
   // Don't show toolbar inside editable fields (refine context menu covers those)
@@ -608,7 +751,6 @@ document.addEventListener("keydown", (e) => {
 // ─────────────────────────────────────────────
 
 let readingModeActive = false;
-let highlightedParas = [];
 
 /**
  * Activates Reading Mode: injects the sidebar and sets up paragraph click handlers.
@@ -642,7 +784,7 @@ async function activateReadingMode() {
   // Hint
   const hint = document.createElement("div");
   hint.className = "geminify-reading-hint";
-  hint.innerHTML = `<strong>Tip:</strong> Click any paragraph on the page to ask Gemini about it instantly.`;
+  hint.innerHTML = `<strong>Tip:</strong> Select any text on the page to explain, fix, or summarize it instantly.`;
   body.appendChild(hint);
 
   // Summary section
@@ -679,17 +821,7 @@ async function activateReadingMode() {
   // Close button
   document.getElementById("geminify-reading-close").addEventListener("click", deactivateReadingMode);
 
-  // ── Highlight paragraphs ──────────────────────────
-  const article = document.querySelector("article, [role='main'], main") || document.body;
-  const paragraphs = Array.from(article.querySelectorAll("p, h2, h3, li"))
-    .filter(el => el.innerText && el.innerText.trim().length > 60 && !el.closest("#geminify-reading-sidebar"));
 
-  paragraphs.forEach(para => {
-    para.classList.add("geminify-para-highlight");
-    const onClick = () => handleParagraphClick(para);
-    para.addEventListener("click", onClick);
-    highlightedParas.push({ el: para, handler: onClick });
-  });
 
   // ── Generate AI summary ───────────────────────────
   chrome.storage.sync.get(["googleApiKey", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
@@ -731,44 +863,14 @@ async function activateReadingMode() {
   });
 }
 
-/**
- * Handles a paragraph click in reading mode — shows an inline Q&A box.
- * @param {HTMLElement} para
- */
-function handleParagraphClick(para) {
-  const paraText = para.innerText.trim().substring(0, 600);
-  addBox(para, "Analysing paragraph...", { title: "Paragraph Insight" });
 
-  chrome.storage.sync.get(["googleApiKey", "isFreePlan", "aiProvider", "openrouterApiKey", "openrouterModel"], async (data) => {
-    const activeKey = data.aiProvider === "openrouter" ? data.openrouterApiKey : data.aiProvider === "windowai" ? "local" : data.googleApiKey;
-    if (!activeKey) {
-      addBox(para, "No API key set.");
-      return;
-    }
-
-    try {
-      const result = await callAI(
-        `Explain this paragraph clearly and highlight any key insight, claim, or implication in 2-3 sentences:\n\n"${paraText}"`,
-        data.googleApiKey,
-        { aiProvider: data.aiProvider, openrouterApiKey: data.openrouterApiKey, openrouterModel: data.openrouterModel }
-      );
-      addBox(para, result, { title: "Paragraph Insight" });
-    } catch {
-      addBox(para, "Could not analyse paragraph.");
-    }
-  });
-}
 
 /**
  * Deactivates Reading Mode: removes the sidebar and cleans up paragraph highlights.
  */
 function deactivateReadingMode() {
   document.getElementById("geminify-reading-sidebar")?.remove();
-  highlightedParas.forEach(({ el, handler }) => {
-    el.removeEventListener("click", handler);
-    el.classList.remove("geminify-para-highlight");
-  });
-  highlightedParas = [];
+  document.getElementById("geminify-toolbar")?.remove();
   readingModeActive = false;
 }
 
