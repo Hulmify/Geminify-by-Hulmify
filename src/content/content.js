@@ -668,7 +668,7 @@ function handleToolbarAction(text, tone) {
   addStyles();
 
   if (tone === "chat") {
-    chrome.storage.sync.set({ selectedText: text }, () => {
+    chrome.storage.local.set({ selectedText: text }, () => {
       chrome.runtime.sendMessage({ action: "openPopup" });
     });
     return;

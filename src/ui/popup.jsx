@@ -162,42 +162,77 @@ const App = () => {
   useEffect(() => {
     // Load all persisted settings
     chrome.storage.sync.get(
-      ["selectedText", "googleApiKey", "openrouterApiKey", "aiProvider", "openrouterModel", "refineCustomPrompt",
-       "response", "userInput", "isFreePlan", "useAiSummaries", "autoCopy",
-       "isDarkMode", "customCategories", "contextStack", "promptTemplates"],
-      (data) => {
-        const maxChars = data.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
-        if (data.selectedText)        setSelectedText(data.selectedText.substring(0, maxChars));
-        if (data.googleApiKey)        setGoogleApiKey(data.googleApiKey);
-        if (data.openrouterApiKey)    setOpenrouterApiKey(data.openrouterApiKey);
-        if (data.aiProvider)          setAiProvider(data.aiProvider);
-        if (data.openrouterModel)     setOpenrouterModel(data.openrouterModel);
-        if (data.refineCustomPrompt)  setRefineCustomPrompt(data.refineCustomPrompt);
-        if (data.response)            setResponse(data.response);
-        if (data.userInput)           setUserInput(data.userInput);
-        if (data.isFreePlan !== undefined) setIsFreePlan(data.isFreePlan);
-        setUseAiSummaries(data.useAiSummaries ?? false);
-        if (data.autoCopy !== undefined)   setAutoCopy(data.autoCopy);
-        if (data.isDarkMode !== undefined) setIsDarkMode(data.isDarkMode);
-        if (data.customCategories)    setCustomCategories(data.customCategories);
-        if (data.contextStack)        setContextStack(data.contextStack);
-        if (data.promptTemplates)     setPromptTemplates(data.promptTemplates);
+      ["googleApiKey", "openrouterApiKey", "aiProvider", "openrouterModel", "refineCustomPrompt",
+       "isFreePlan", "useAiSummaries", "autoCopy", "isDarkMode", "customCategories", "promptTemplates"],
+      (syncData) => {
+        if (syncData.googleApiKey)        setGoogleApiKey(syncData.googleApiKey);
+        if (syncData.openrouterApiKey)    setOpenrouterApiKey(syncData.openrouterApiKey);
+        if (syncData.aiProvider)          setAiProvider(syncData.aiProvider);
+        if (syncData.openrouterModel)     setOpenrouterModel(syncData.openrouterModel);
+        if (syncData.refineCustomPrompt)  setRefineCustomPrompt(syncData.refineCustomPrompt);
+        if (syncData.isFreePlan !== undefined) setIsFreePlan(syncData.isFreePlan);
+        setUseAiSummaries(syncData.useAiSummaries ?? false);
+        if (syncData.autoCopy !== undefined)   setAutoCopy(syncData.autoCopy);
+        if (syncData.isDarkMode !== undefined) setIsDarkMode(syncData.isDarkMode);
+        if (syncData.customCategories)    setCustomCategories(syncData.customCategories);
+        if (syncData.promptTemplates)     setPromptTemplates(syncData.promptTemplates);
+
+        // Load local-only/transient data
+        chrome.storage.local.get(
+          {
+            selectedText: NO_CONTEXT_TEXT,
+            response: "No response yet.",
+            userInput: "",
+            contextStack: [],
+            savedPages: [],
+            chatHistory: []
+          },
+          (localData) => {
+            const maxChars = syncData.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
+            setSelectedText((localData.selectedText || NO_CONTEXT_TEXT).substring(0, maxChars));
+            if (localData.response)     setResponse(localData.response);
+            if (localData.userInput)    setUserInput(localData.userInput);
+            if (localData.contextStack) setContextStack(localData.contextStack);
+            setSavedPages(localData.savedPages);
+            if (localData.chatHistory?.length) setChatHistory(localData.chatHistory);
+
+            // Auto-pull highlighted text selection from the active tab
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+              const activeTab = tabs?.[0];
+              if (activeTab?.id && activeTab.url && (activeTab.url.startsWith("http://") || activeTab.url.startsWith("https://"))) {
+                chrome.scripting.executeScript(
+                  {
+                    target: { tabId: activeTab.id },
+                    func: () => window.getSelection().toString().trim(),
+                  },
+                  (results) => {
+                    if (chrome.runtime.lastError) {
+                      console.log("Could not fetch page selection:", chrome.runtime.lastError.message);
+                      return;
+                    }
+                    const activeSelection = results?.[0]?.result;
+                    if (activeSelection) {
+                      const truncatedSelection = activeSelection.substring(0, maxChars);
+                      setSelectedText(truncatedSelection);
+                      chrome.storage.local.set({ selectedText: truncatedSelection });
+                    }
+                  }
+                );
+              }
+            });
+          }
+        );
       }
     );
-
-    // Load local-only data
-    chrome.storage.local.get({ savedPages: [], chatHistory: [] }, (data) => {
-      setSavedPages(data.savedPages);
-      if (data.chatHistory?.length) setChatHistory(data.chatHistory);
-    });
 
     // Reactive storage listener
     const storageListener = (changes) => {
       if (changes.savedPages)         setSavedPages(changes.savedPages.newValue);
       if (changes.selectedText) {
+        const val = changes.selectedText.newValue || NO_CONTEXT_TEXT;
         chrome.storage.sync.get(["isFreePlan"], (d) => {
           const max = d.isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
-          setSelectedText(changes.selectedText.newValue.substring(0, max));
+          setSelectedText(val.substring(0, max));
         });
       }
       if (changes.isFreePlan)         setIsFreePlan(changes.isFreePlan.newValue);
@@ -403,7 +438,9 @@ Context: ${fullContext || "No context provided."}`;
             throw new Error("Local AI is not available in this browser version.");
           }
           const userText = userInput.trim() || "Please summarize neatly.";
-          let promptContent = [{ type: "text", value: userText }];
+          // Prefix system context to ensure it is always passed to the local built-in AI model
+          const prependedPromptText = `${systemText}\n\n---\n\nUser Request: ${userText}`;
+          let promptContent = [{ type: "text", value: prependedPromptText }];
           
           if (screenshotData) {
             const byteCharacters = atob(screenshotData);
@@ -449,7 +486,7 @@ Context: ${fullContext || "No context provided."}`;
             streamReaderRef.current = null;
           }
           
-          chrome.storage.sync.set({ response: accumulated });
+          chrome.storage.local.set({ response: accumulated });
           const newHistory = [
             ...chatHistory,
             { role: "user", text: userInput.trim() || "Please summarize neatly.", timestamp: Date.now() },
@@ -517,7 +554,7 @@ Context: ${fullContext || "No context provided."}`;
             method: "POST",
             headers: { "x-goog-api-key": googleApiKey, "Content-Type": "application/json" },
             body: JSON.stringify({
-              system_instruction: { parts: [{ text: systemText }] },
+              systemInstruction: { parts: [{ text: systemText }] },
               contents
             }),
           }
@@ -572,7 +609,7 @@ Context: ${fullContext || "No context provided."}`;
         }
       }
 
-      chrome.storage.sync.set({ response: accumulated });
+      chrome.storage.local.set({ response: accumulated });
 
       // Update conversation history (keep last 20 messages = 10 turns)
       const newHistory = [
@@ -709,7 +746,7 @@ Context: ${fullContext || "No context provided."}`;
       if (text) {
         const maxChars = isFreePlan ? MAX_CONTEXT_CHARS_FREE : MAX_CONTEXT_CHARS_DEFAULT;
         setSelectedText(text.substring(0, maxChars));
-        chrome.storage.sync.set({ selectedText: text });
+        chrome.storage.local.set({ selectedText: text });
       }
     });
   };
@@ -718,9 +755,9 @@ Context: ${fullContext || "No context provided."}`;
     if (selectedText === NO_CONTEXT_TEXT) return;
     const newStack = [...contextStack, selectedText].slice(-5);
     setContextStack(newStack);
-    chrome.storage.sync.set({ contextStack: newStack });
+    chrome.storage.local.set({ contextStack: newStack });
     setSelectedText(NO_CONTEXT_TEXT);
-    chrome.storage.sync.set({ selectedText: NO_CONTEXT_TEXT });
+    chrome.storage.local.set({ selectedText: NO_CONTEXT_TEXT });
   };
 
   const handleClearAll = () => {
@@ -730,7 +767,7 @@ Context: ${fullContext || "No context provided."}`;
     setChatHistory([]);
     setContextStack([]);
     clearAttachments();
-    chrome.storage.sync.set({ selectedText: NO_CONTEXT_TEXT, userInput: "", response: "No response yet.", contextStack: [] });
+    chrome.storage.local.set({ selectedText: NO_CONTEXT_TEXT, userInput: "", response: "No response yet.", contextStack: [] });
     chrome.storage.local.set({ chatHistory: [] });
   };
 
@@ -865,7 +902,7 @@ Context: ${fullContext || "No context provided."}`;
                   title={t.prompt}
                   onClick={() => {
                     setUserInput(t.prompt);
-                    chrome.storage.sync.set({ userInput: t.prompt });
+                    chrome.storage.local.set({ userInput: t.prompt });
                   }}
                 >
                   <TemplateIcon icon={t.icon} />
@@ -905,7 +942,7 @@ Context: ${fullContext || "No context provided."}`;
             <textarea
               placeholder="Ask about this page… or use a template above"
               value={userInput}
-              onChange={e => { setUserInput(e.target.value); chrome.storage.sync.set({ userInput: e.target.value }); }}
+              onChange={e => { setUserInput(e.target.value); chrome.storage.local.set({ userInput: e.target.value }); }}
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
             />
 

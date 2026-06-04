@@ -87,7 +87,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   if (info.menuItemId === "sendText") {
     // Save selected text to storage and open the popup
-    chrome.storage.sync.set({ selectedText: info.selectionText }, () => {
+    chrome.storage.local.set({ selectedText: info.selectionText }, () => {
       chrome.action.openPopup();
     });
 
