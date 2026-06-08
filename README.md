@@ -2,7 +2,7 @@
 
 **AI Summarizer & Assistant for Chrome** — by [Hulmify](https://hulmify.com)
 
-> Summarize pages, chat with context, and organize web insights instantly using the power of Google Gemini AI.
+> Summarize pages, chat with context, and organize web insights instantly using the power of Google Gemini and other leading AI providers.
 
 <img width="1280" height="800" alt="Banner Geminify" src="https://github.com/user-attachments/assets/7f9f43f2-78da-42d0-932e-919d5629faff" />
 
